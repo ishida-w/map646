@@ -25,8 +25,16 @@
 #ifndef __PMTUDISC_H__
 #define __PMTUDISC_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int pmtudisc_initialize(void);
 int pmtudisc_get_path_mtu_size(int, const void *);
 int pmtudisc_update_path_mtu_size(int, const void *, int);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

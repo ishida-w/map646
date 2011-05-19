@@ -25,6 +25,10 @@
 #ifndef __MAPPING_H__
 #define __MAPPING_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SIXTOSIX_ItoG 1
 #define SIXTOSIX_GtoI 2
 #define SIXTOFOUR 3
@@ -51,5 +55,9 @@ int mapping66_convert_addrs_GtoI(const struct in6_addr *,
 int dispatch_6(const struct in6_addr *, const struct in6_addr *);
 int mapping_install_route(void);
 int mapping_uninstall_route(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

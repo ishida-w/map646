@@ -68,6 +68,7 @@ void cleanup(void);
 void reload_sighup(int);
 
 int tun_fd;
+int stat_fd;
 char *map646_conf_path = "/etc/map646.conf";
 
 
@@ -100,6 +101,7 @@ main(int argc, char *argv[])
   if (tun_fd == -1) {
     errx(EXIT_FAILURE, "cannot open a tun internface %s.", tun_if_name);
   }
+   
 
   /* Create mapping table from the configuraion file. */
   if (mapping_create_table(map646_conf_path, 0) == -1) {
@@ -218,7 +220,7 @@ send_4to6(void *datap, size_t data_len)
 {
   assert (datap != NULL);
 
-  uint8_t *packetp = datap;
+  uint8_t *packetp = (uint8_t *)datap;
 
   /* Analyze IPv4 header contents. */
   struct ip *ip4_hdrp;
@@ -275,7 +277,7 @@ send_4to6(void *datap, size_t data_len)
   if (ip4_proto == IPPROTO_ICMP) {
     int discard_ok = 0;
     if (icmpsub_process_icmp4(tun_fd, (const struct icmp *)packetp,
-			      data_len - ((void *)packetp - datap),
+			      data_len - sizeof(ip4_hlen),
 			      &discard_ok)
 	== -1) {
       return (0);
@@ -556,7 +558,7 @@ send_6to4(void *datap, size_t data_len)
 {
   assert(datap != NULL);
 
-  char *packetp = datap;
+  char *packetp = (char *)datap;
 
   /* Analyze IPv6 header contents. */
   struct ip6_hdr *ip6_hdrp;
@@ -570,7 +572,7 @@ send_6to4(void *datap, size_t data_len)
   if (ip6_next_header == IPPROTO_ICMPV6) {
     int discard_ok = 0;
     if (icmpsub_process_icmp6(tun_fd, (const struct icmp6_hdr *)packetp,
-			      data_len - ((void *)packetp - datap),
+			      data_len - sizeof(ip6_hdr),
 			      &discard_ok)
 	== -1) {
       return (0);
@@ -868,7 +870,7 @@ send66_ItoG(void *datap, size_t data_len)
 {
    assert(datap != NULL);
 
-   char *packetp = datap;
+   char *packetp = (char *)datap;
 
    /* Analyze IPv6 header contents. */
    struct ip6_hdr *ip6_hdrp;
@@ -882,7 +884,7 @@ send66_ItoG(void *datap, size_t data_len)
    if (ip6_next_header == IPPROTO_ICMPV6) {
       int discard_ok = 0;
       if (icmpsub_process_icmp6(tun_fd, (const struct icmp6_hdr *)packetp,
-               data_len - ((void *)packetp - datap),
+               data_len - sizeof(ip6_hdr),
                &discard_ok)
             == -1) {
          return (0);
@@ -1010,7 +1012,7 @@ send66_GtoI(void *datap, size_t data_len)
 {
    assert(datap != NULL);
 
-   char *packetp = datap;
+   char *packetp = (char *)datap;
 
    /* Analyze IPv6 header contents. */
    struct ip6_hdr *ip6_hdrp;
@@ -1024,7 +1026,7 @@ send66_GtoI(void *datap, size_t data_len)
    if (ip6_next_header == IPPROTO_ICMPV6) {
       int discard_ok = 0;
       if (icmpsub_process_icmp6(tun_fd, (const struct icmp6_hdr *)packetp,
-               data_len - ((void *)packetp - datap),
+               data_len - sizeof(ip6_hdr),
                &discard_ok)
             == -1) {
          return (0);
@@ -1147,7 +1149,7 @@ static int
 send_6(void *datap, size_t data_len)
 {
   assert(datap != NULL);
-  char *packetp = datap;
+  char *packetp = (char *)datap;
   /* Analyze IPv6 header contents. */
   struct ip6_hdr *ip6_hdrp;
   ip6_hdrp = (struct ip6_hdr *)packetp;
