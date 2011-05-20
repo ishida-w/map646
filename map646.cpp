@@ -31,6 +31,7 @@
 #include <unistd.h>
 
 #include <sys/uio.h>
+#include <sys/un.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -59,7 +60,6 @@
 
 #define STAT_SOCK "/tmp/map646_stat"
 
-
 static int send_4to6(void *, size_t);
 static int send_6to4(void *, size_t);
 static int send66_GtoI(void *, size_t);
@@ -75,7 +75,6 @@ char *map646_conf_path = "/etc/map646.conf";
 
 main(int argc, char *argv[])
 {
-   int stat_fd;
    /* Initialization of supporting classes. */
    if (mapping_initialize() == -1) {
       errx(EXIT_FAILURE, "failed to initialize the mapping class.");
@@ -104,9 +103,44 @@ main(int argc, char *argv[])
    }
 
    /* Create a stat socket */
-   if((stat_fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
+
+   int stat_listen_fd, stat_fd;
+   sockaddr_un saddr;
+   sockaddr_un caddr;
+   socklen_t len;
+
+   if((stat_listen_fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
       errx(EXIT_FAILURE, "failed to create stat socket");
    }
+
+   memset((char *)&saddr, 0, sizeof(saddr));
+
+   saddr.sun_family = AF_UNIX;
+   strcpy(saddr.sun_path, STAT_SOCK);
+
+   unlink(STAT_SOCK);
+   if(bind(stat_listen_fd, (sockaddr *)&saddr, sizeof(saddr.sun_family) + strlen(STAT_SOCK)) < 0){
+      errx(EXIT_FAILURE, "failed to bind stat socket");
+   }
+
+   if(listen(stat_listen_fd, 1) < 0){
+         errx(EXIT_FAILURE, "failed to listen to stat socket");
+   }
+
+   /* Set up select */
+   fd_set fds, readfds;
+   int maxfd;
+
+   FD_ZERO(&readfds);
+   FD_SET(tun_fd, &readfds);
+   FD_SET(stat_listen_fd, &readfds);
+
+   if(tun_fd > stat_listen_fd){
+      maxfd = tun_fd;
+   }else{
+      maxfd = stat_listen_fd;
+   }
+
 
    /* Create mapping table from the configuraion file. */
    if (mapping_create_table(map646_conf_path, 0) == -1) {
@@ -125,26 +159,43 @@ main(int argc, char *argv[])
    ssize_t read_len;
    char buf[BUF_LEN];
    char *bufp;
-   while ((read_len = read(tun_fd, (void *)buf, BUF_LEN)) != -1) {
-      bufp = buf;
+   while(1)
+   {
+      memcpy(&fds, &readfds, sizeof(fd_set));
 
-      uint32_t af = 0;
-      af = tun_get_af(bufp);
-      bufp += sizeof(uint32_t);
+      select(maxfd + 1, &fds, NULL, NULL, NULL);
+
+      if(FD_ISSET(tun_fd, &fds)){
+         read_len = read(tun_fd, (void *)buf, BUF_LEN);
+         
+         bufp = buf;
+
+         uint32_t af = 0;
+         af = tun_get_af(bufp);
+         bufp += sizeof(uint32_t);
 #ifdef DEBUG
-      fprintf(stderr, "af = %d\n", af);
+         fprintf(stderr, "af = %d\n", af);
 #endif
-      switch (af) {
-         case AF_INET:
-            send_4to6(bufp, (size_t)read_len);
-            break;
-         case AF_INET6:
-            send_6(bufp, (size_t)read_len);
-            break;
-         default:
-            warnx("unsupported address family %d is received.", af);
+         switch (af) {
+            case AF_INET:
+               send_4to6(bufp, (size_t)read_len);
+               break;
+            case AF_INET6:
+               send_6(bufp, (size_t)read_len);
+               break;
+            default:
+               warnx("unsupported address family %d is received.", af);
+         }
+      }
+
+      if(FD_ISSET(stat_listen_fd, &fds)){
+         if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
+            errx(EXIT_FAILURE, "failed to accept stat client");
+         }
+         close(stat_listen_fd);
       }
    }
+   
    /*
     * The program reaches here only when read(2) fails in the above
     * while loop.  This happens when a user type Ctrl-C too.
