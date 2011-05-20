@@ -70,6 +70,8 @@ void cleanup(void);
 void reload_sighup(int);
 
 int tun_fd;
+int stat_listen_fd, stat_fd;
+
 char *map646_conf_path = "/etc/map646.conf";
 
 
@@ -103,8 +105,8 @@ main(int argc, char *argv[])
    }
 
    /* Create a stat socket */
-
-   int stat_listen_fd, stat_fd;
+   stat_listen_fd = -1;
+   stat_fd = -1;
    sockaddr_un saddr;
    sockaddr_un caddr;
    socklen_t len;
@@ -140,7 +142,7 @@ main(int argc, char *argv[])
    }else{
       maxfd = stat_listen_fd;
    }
-
+   
 
    /* Create mapping table from the configuraion file. */
    if (mapping_create_table(map646_conf_path, 0) == -1) {
@@ -159,6 +161,7 @@ main(int argc, char *argv[])
    ssize_t read_len;
    char buf[BUF_LEN];
    char *bufp;
+   
    while(1)
    {
       memcpy(&fds, &readfds, sizeof(fd_set));
@@ -227,6 +230,12 @@ cleanup(void)
 {
    if (tun_fd != -1) {
       close(tun_fd);
+   }
+   if (stat_listen_fd != -1){
+      close(stat_listen_fd);
+   }
+   if (stat_fd != -1){
+      close(stat_fd);
    }
 
 #if !defined(__linux__)
