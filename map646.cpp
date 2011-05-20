@@ -195,7 +195,8 @@ main(int argc, char *argv[])
          if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
             errx(EXIT_FAILURE, "failed to accept stat client");
          }
-         close(stat_listen_fd);
+         write(stat_fd, "hello", sizeof("hello"));
+         close(stat_fd);
       }
    }
    
