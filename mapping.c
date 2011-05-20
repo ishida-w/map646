@@ -482,6 +482,12 @@ mapping_install_route(void)
 
    struct mapping66 *mapping66p;
    SLIST_FOREACH(mapping66p, &mapping66_head, entries) {
+      if (tun_add_route(AF_INET6, &mapping66p->global, 128) == -1){
+         char addr_name[64];
+         warnx("IPv6 host %s route entry addition failed.",
+               inet_ntop(AF_INET6, &mapping66p->global, addr_name, 64));
+      }
+
       if (tun_add_policy(AF_INET6, &mapping66p->intra, 128) == -1) {
          char addr_name[64];
          warnx("IPv6 host %s policy route entry addition failed.",
