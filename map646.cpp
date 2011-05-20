@@ -30,6 +30,9 @@
 #include <err.h>
 #include <unistd.h>
 
+#include <iostream>
+#include <string>
+
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <sys/types.h>
@@ -72,11 +75,22 @@ void reload_sighup(int);
 int tun_fd;
 int stat_listen_fd, stat_fd;
 
-char *map646_conf_path = "/etc/map646.conf";
-
+std::string map646_conf_path("/etc/map646.conf");
 
 main(int argc, char *argv[])
 {
+   if(argc == 3){
+      if(!strcmp("-c", argv[1])){
+         map646_conf_path = argv[2];
+      }else{
+         std::cout <<"Usage:" << argv[0] << " [-c] <Conf path>" << std::endl;
+         exit(1);
+      }
+   }else if(argc != 1){
+      std::cout <<"Usage:" << argv[0] << " [-c] <Conf path>" << std::endl;
+      exit(1);
+   }
+
    /* Initialization of supporting classes. */
    if (mapping_initialize() == -1) {
       errx(EXIT_FAILURE, "failed to initialize the mapping class.");
@@ -145,7 +159,7 @@ main(int argc, char *argv[])
    
 
    /* Create mapping table from the configuraion file. */
-   if (mapping_create_table(map646_conf_path, 0) == -1) {
+   if (mapping_create_table(map646_conf_path.c_str(), 0) == -1) {
       errx(EXIT_FAILURE, "mapping table creation failed.");
    }
 
@@ -264,7 +278,7 @@ reload_sighup(int dummy)
    mapping_destroy_table();
 
    /* Create a new mapping table from the configuraion file. */
-   if (mapping_create_table(map646_conf_path, 0) == -1) {
+   if (mapping_create_table(map646_conf_path.c_str(), 0) == -1) {
       errx(EXIT_FAILURE, "mapping table creation failed.");
    }
 
