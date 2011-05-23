@@ -1,0 +1,100 @@
+/*
+ * Copyright 2010 IIJ Innovation Institute Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY IIJ INNOVATION INSTITUTE INC. ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL IIJ INNOVATION INSTITUTE INC. OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <stdint.h>
+#include <assert.h>
+#include <err.h>
+#include <unistd.h>
+
+#if !defined(__linux__)
+#include <sys/types.h>
+#include <sys/param.h>
+#endif
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <sys/un.h>
+
+#include <net/if.h>
+#if defined(__linux__)
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#include <linux/fib_rules.h>
+#include <linux/if_tun.h>
+#include <linux/if_ether.h>
+#include <arpa/inet.h>
+#else
+#include <ifaddrs.h>
+#include <net/route.h>
+#include <net/if_dl.h>
+#include <net/if_tun.h>
+#endif
+#include <netinet/in.h>
+
+#include "stat.h"
+
+#include <iostream>
+#include <string>
+
+int statif_alloc(){
+   int stat_listen_fd;   
+   sockaddr_un saddr;
+   
+   if((stat_listen_fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
+      errx(EXIT_FAILURE, "failed to create stat socket");
+   }
+
+   memset((char *)&saddr, 0, sizeof(saddr));
+
+   saddr.sun_family = AF_UNIX;
+   strcpy(saddr.sun_path, STAT_SOCK);
+
+   unlink(STAT_SOCK);
+   if(bind(stat_listen_fd, (sockaddr *)&saddr, sizeof(saddr.sun_family) + strlen(STAT_SOCK)) < 0){
+      errx(EXIT_FAILURE, "failed to bind stat socket");
+   }
+
+   if(listen(stat_listen_fd, 1) < 0){
+         errx(EXIT_FAILURE, "failed to listen to stat socket");
+   }
+
+   return stat_listen_fd;
+}
+
+void stat_::increment(){
+   std::cout << "stat_::increment() called" << std::endl;
+   value++;
+}
+
+void stat_::send_info(int fd){
+   std::cout << "stat_::send_info() called. value: " << value << std::endl;
+   char ch[sizeof(int)];
+   sprintf(ch, "%d", value);
+    
+   std::string str(ch);
+   write(fd, str.c_str(), sizeof(str.c_str()));
+}

@@ -52,6 +52,7 @@
 #include "checksum.h"
 #include "pmtudisc.h"
 #include "icmpsub.h"
+#include "stat.h"
 
 #if defined(__linux__)
 #define IPV6_VERSION 0x60
@@ -61,7 +62,6 @@
                         local interfaces used to transmit actual
                         packets. */
 
-#define STAT_SOCK "/tmp/map646_stat"
 
 static int send_4to6(void *, size_t);
 static int send_6to4(void *, size_t);
@@ -75,10 +75,14 @@ void reload_sighup(int);
 int tun_fd;
 int stat_listen_fd, stat_fd;
 
+stat_ stat;
+
 std::string map646_conf_path("/etc/map646.conf");
 
-main(int argc, char *argv[])
+
+int main(int argc, char *argv[])
 {
+   /* Configuration path option */
    if(argc == 3){
       if(!strcmp("-c", argv[1])){
          map646_conf_path = argv[2];
@@ -121,27 +125,10 @@ main(int argc, char *argv[])
    /* Create a stat socket */
    stat_listen_fd = -1;
    stat_fd = -1;
-   sockaddr_un saddr;
    sockaddr_un caddr;
    socklen_t len;
-
-   if((stat_listen_fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
-      errx(EXIT_FAILURE, "failed to create stat socket");
-   }
-
-   memset((char *)&saddr, 0, sizeof(saddr));
-
-   saddr.sun_family = AF_UNIX;
-   strcpy(saddr.sun_path, STAT_SOCK);
-
-   unlink(STAT_SOCK);
-   if(bind(stat_listen_fd, (sockaddr *)&saddr, sizeof(saddr.sun_family) + strlen(STAT_SOCK)) < 0){
-      errx(EXIT_FAILURE, "failed to bind stat socket");
-   }
-
-   if(listen(stat_listen_fd, 1) < 0){
-         errx(EXIT_FAILURE, "failed to listen to stat socket");
-   }
+  
+   stat_listen_fd = statif_alloc();
 
    /* Set up select */
    fd_set fds, readfds;
@@ -180,9 +167,13 @@ main(int argc, char *argv[])
    {
       memcpy(&fds, &readfds, sizeof(fd_set));
 
-      select(maxfd + 1, &fds, NULL, NULL, NULL);
+      if(select(maxfd + 1, &fds, NULL, NULL, NULL) == -1){
+         warnx("error from select");
+         continue;
+      }
 
       if(FD_ISSET(tun_fd, &fds)){
+         stat.increment();
          read_len = read(tun_fd, (void *)buf, BUF_LEN);
          
          bufp = buf;
@@ -207,16 +198,17 @@ main(int argc, char *argv[])
 
       if(FD_ISSET(stat_listen_fd, &fds)){
          if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
-            errx(EXIT_FAILURE, "failed to accept stat client");
+            warnx("failed to accept stat client");
+            continue;
          }
-         write(stat_fd, "hello", sizeof("hello"));
+         stat.send_info(stat_fd);
          close(stat_fd);
       }
    }
    
    /*
     * The program reaches here only when read(2) fails in the above
-    * while loop.  This happens when a user type Ctrl-C too.
+    * while loop. 
     */
    if (mapping_uninstall_route() == -1) {
       warnx("failed to uninstall route entries created before.  should we continue?");
@@ -266,6 +258,7 @@ cleanup(void)
    void
 reload_sighup(int dummy)
 {
+   std::cout << "reload_sighup" << std::endl;
    /* 
     * Uninstall all the route installed when the configuration file was
     * read last time.
