@@ -28,6 +28,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <err.h>
+#include <errno.h>
 #include <unistd.h>
 
 #include <iostream>
@@ -130,20 +131,23 @@ int main(int argc, char *argv[])
   
    stat_listen_fd = statif_alloc();
 
-   /* Set up select */
+   /* Set up pselect */
    fd_set fds, readfds;
    int maxfd;
+   sigset_t sigset;
 
    FD_ZERO(&readfds);
    FD_SET(tun_fd, &readfds);
    FD_SET(stat_listen_fd, &readfds);
+
+   sigemptyset(&sigset);
+   sigaddset(&sigset, SIGHUP);
 
    if(tun_fd > stat_listen_fd){
       maxfd = tun_fd;
    }else{
       maxfd = stat_listen_fd;
    }
-   
 
    /* Create mapping table from the configuraion file. */
    if (mapping_create_table(map646_conf_path.c_str(), 0) == -1) {
@@ -167,9 +171,20 @@ int main(int argc, char *argv[])
    {
       memcpy(&fds, &readfds, sizeof(fd_set));
 
-      if(select(maxfd + 1, &fds, NULL, NULL, NULL) == -1){
-         warnx("error from select");
-         continue;
+      if(pselect(maxfd + 1, &fds, NULL, NULL, NULL, &sigset) == -1){
+         int errsv = errno;
+      /*
+         if(errsv == EINVAL){
+            std::cout << "EINVAL" << std::endl;
+         }else if(errsv == EBADF){
+            std::cout << "EBADA" << std::endl;
+         }else if(errsv == EINTR){
+            std::cout << "EINTR" << std::endl;
+         }else if(errsv == ENOMEM){
+            std::cout << "ENOMEM" << std::endl;
+         }
+      */
+         errx(EXIT_FAILURE, "error from select");
       }
 
       if(FD_ISSET(tun_fd, &fds)){
@@ -235,6 +250,7 @@ cleanup_sigint(int dummy)
    void
 cleanup(void)
 {
+   std::cout << "cleanup called" << std::endl;
    if (tun_fd != -1) {
       close(tun_fd);
    }
