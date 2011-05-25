@@ -39,6 +39,12 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/icmp6.h>
+
 
 #include "mapping.h"
 #include "tunif.h"
@@ -764,21 +770,35 @@ mapping66_insert_mapping(struct mapping66 *new_mappingp)
    return (0);
 }
 
-int dispatch_6(const struct in6_addr* src, const struct in6_addr* dst){
-   const struct mapping66 *mapping66p
-      = mapping66_find_mapping_with_I_addr(src);
-   const struct mapping *mappingp
-      = mapping_find_mapping_with_ip6_addr(src);
+uint32_t dispatch(void *bufp){
+   assert(bufp != NULL);
+   uint32_t af = 0;
+   af = tun_get_af(bufp);
+   bufp += sizeof(uint32_t);
+#ifdef DEBUG
+         fprintf(stderr, "af = %d\n", af);
+#endif
+   
+   if(af == AF_INET){
+      return FOURTOSIX;
+   }else if(af == AF_INET6){
+      struct ip6_hdr *ip6_hdrp = (struct ip6_hdr *)bufp;
 
-   if(!mapping66p && !mappingp){
-      return SIXTOSIX_GtoI;
-   }else{
-      if(memcmp(dst, &mapping_prefix, 8) == 0)
-         return SIXTOFOUR;
-      else
-         return SIXTOSIX_ItoG;
+      const struct mapping66 *mapping66p 
+         = mapping66_find_mapping_with_I_addr(&ip6_hdrp->ip6_src);
+      const struct mapping *mappingp
+         = mapping_find_mapping_with_ip6_addr(&ip6_hdrp->ip6_src);
+
+      if(!mapping66p && !mappingp){
+         return SIXTOSIX_GtoI;
+      }else{
+         if(memcmp(&ip6_hdrp->ip6_dst, &mapping_prefix, 8) == 0)
+            return SIXTOFOUR;
+         else
+            return SIXTOSIX_ItoG;
+      }
    }
 
    return 0;
-}
 
+}

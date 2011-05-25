@@ -68,7 +68,7 @@ static int send_4to6(void *, size_t);
 static int send_6to4(void *, size_t);
 static int send66_GtoI(void *, size_t);
 static int send66_ItoG(void *, size_t);
-static int send_6(void *, size_t);
+
 void cleanup_sigint(int);
 void cleanup(void);
 void reload_sighup(int);
@@ -76,7 +76,7 @@ void reload_sighup(int);
 int tun_fd;
 int stat_listen_fd, stat_fd;
 
-stat_ stat;
+map646_stat::stat stat;
 
 std::string map646_conf_path("/etc/map646.conf");
 
@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
    sockaddr_un caddr;
    socklen_t len;
   
-   stat_listen_fd = statif_alloc();
+   stat_listen_fd = map646_stat::statif_alloc();
 
    /* Set up pselect */
    fd_set fds, readfds;
@@ -166,48 +166,38 @@ int main(int argc, char *argv[])
    ssize_t read_len;
    char buf[BUF_LEN];
    char *bufp;
-   
+  
+   /* MAIN WHILE LOOP */ 
    while(1)
    {
       memcpy(&fds, &readfds, sizeof(fd_set));
 
       if(pselect(maxfd + 1, &fds, NULL, NULL, NULL, &sigset) == -1){
-         int errsv = errno;
-      /*
-         if(errsv == EINVAL){
-            std::cout << "EINVAL" << std::endl;
-         }else if(errsv == EBADF){
-            std::cout << "EBADA" << std::endl;
-         }else if(errsv == EINTR){
-            std::cout << "EINTR" << std::endl;
-         }else if(errsv == ENOMEM){
-            std::cout << "ENOMEM" << std::endl;
-         }
-      */
          errx(EXIT_FAILURE, "error from select");
       }
 
       if(FD_ISSET(tun_fd, &fds)){
-         stat.increment();
-         read_len = read(tun_fd, (void *)buf, BUF_LEN);
          
+         read_len = read(tun_fd, (void *)buf, BUF_LEN);
          bufp = buf;
-
-         uint32_t af = 0;
-         af = tun_get_af(bufp);
-         bufp += sizeof(uint32_t);
-#ifdef DEBUG
-         fprintf(stderr, "af = %d\n", af);
-#endif
-         switch (af) {
-            case AF_INET:
+         
+         uint32_t d = dispatch(bufp); 
+         
+         switch (d) {
+            case FOURTOSIX:
                send_4to6(bufp, (size_t)read_len);
                break;
-            case AF_INET6:
-               send_6(bufp, (size_t)read_len);
+            case SIXTOFOUR:
+               send_6to4(bufp, (size_t)read_len);
+               break;
+            case SIXTOSIX_GtoI:
+               send66_GtoI(bufp, (size_t)read_len);
+               break;
+            case SIXTOSIX_ItoG:
+               send66_ItoG(bufp, (size_t)read_len);
                break;
             default:
-               warnx("unsupported address family %d is received.", af);
+               warnx("unsupported mapping");
          }
       }
 
@@ -1232,37 +1222,5 @@ send66_GtoI(void *datap, size_t data_len)
    }
 
    return (0);
-}
-
-   static int
-send_6(void *datap, size_t data_len)
-{
-   assert(datap != NULL);
-   char *packetp = (char *)datap;
-   /* Analyze IPv6 header contents. */
-   struct ip6_hdr *ip6_hdrp;
-   ip6_hdrp = (struct ip6_hdr *)packetp;
-   /* Get some basic IPv6 header values. */
-   struct in6_addr ip6_src, ip6_dst;
-   memcpy((void *)&ip6_src, (const void *)&ip6_hdrp->ip6_src,
-         sizeof(struct in6_addr));
-   memcpy((void *)&ip6_dst, (const void *)&ip6_hdrp->ip6_dst,
-         sizeof(struct in6_addr));
-
-   uint32_t d = 0;
-   d = dispatch_6(&ip6_src, &ip6_dst);
-   switch(d){
-      case SIXTOSIX_ItoG:
-         send66_ItoG(datap, data_len);
-         break;
-      case SIXTOSIX_GtoI:
-         send66_GtoI(datap, data_len);
-         break;
-      case SIXTOFOUR:
-         send_6to4(datap, data_len);
-         break;
-   }
-
-   return 0;
 }
 

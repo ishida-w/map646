@@ -60,6 +60,8 @@
 #include <iostream>
 #include <string>
 
+namespace map646_stat{
+
 int statif_alloc(){
    int stat_listen_fd;   
    sockaddr_un saddr;
@@ -85,16 +87,185 @@ int statif_alloc(){
    return stat_listen_fd;
 }
 
-void stat_::increment(){
-   std::cout << "stat_::increment() called" << std::endl;
-   value++;
+
+void stat::update(const in_addr* addr, uint8_t proto, bool inOrOut, size_t len, bool error){
+   if(proto != IPPROTO_ICMP){
+      warnx("invalid stat query");
+      return;
+   }
+   
+   int hash = get_hash_index(addr, sizeof(in_addr));
+   int hist = get_hist(len);
+
+   if(inOrOut){
+      v4_stat[hash].icmp_in.num++;
+
+      if(error)
+         v4_stat[hash].icmp_in.error++;
+
+      v4_stat[hash].icmp_in.len[hist]++;
+   }else{
+      v4_stat[hash].icmp_out.num++;
+
+      if(error)
+         v4_stat[hash].icmp_out.error++;
+
+      v4_stat[hash].icmp_out.len[hist]++;
+   }
 }
 
-void stat_::send_info(int fd){
-   std::cout << "stat_::send_info() called. value: " << value << std::endl;
-   char ch[sizeof(int)];
-   sprintf(ch, "%d", value);
-    
-   std::string str(ch);
-   write(fd, str.c_str(), sizeof(str.c_str()));
+void stat::update(const in_addr* addr, int port, uint8_t proto, bool inOrOut, size_t len, bool error){
+   if(proto == IPPROTO_ICMP || proto == IPPROTO_ICMPV6){
+      warnx("invalid stat query");
+      return;
+   }
+
+   int hash = get_hash_index(addr, sizeof(in_addr));
+   int hist = get_hist(len);
+   if(inOrOut && proto == IPPROTO_UDP){
+      v4_stat[hash].udp_in.num++;
+
+      if(error)
+         v4_stat[hash].udp_in.error++;
+
+      v4_stat[hash].udp_in.len[hist]++;
+
+   }else if(!inOrOut && proto == IPPROTO_UDP){
+      v4_stat[hash].udp_out.num++;
+
+      if(error)
+         v4_stat[hash].udp_out.error++;
+
+      v4_stat[hash].udp_out.len[hist]++;
+
+   }else if(inOrOut && proto == IPPROTO_TCP){
+       v4_stat[hash].tcp_in.num++;
+
+      if(error)
+         v4_stat[hash].tcp_in.error++;
+
+      v4_stat[hash].tcp_in.len[hist]++;
+
+  }else if(!inOrOut && proto == IPPROTO_TCP){
+       v4_stat[hash].tcp_out.num++;
+
+      if(error)
+         v4_stat[hash].tcp_out.error++;
+
+      v4_stat[hash].tcp_out.len[hist]++;
+
+  }else{
+      warnx("invalid stat query");
+   }
+ 
+}
+
+void stat::update(const in6_addr* addr, uint8_t proto, bool inOrOut, size_t len, bool error){
+   if(proto != IPPROTO_ICMPV6){
+      warnx("invalid stat query");
+      return;
+   }
+
+   int hash = get_hash_index(addr, sizeof(in6_addr));
+   int hist = get_hist(len);
+
+   if(inOrOut){
+      v6_stat[hash].icmp_in.num;
+
+      if(error)
+         v6_stat[hash].icmp_in.error++;
+
+      v6_stat[hash].icmp_in.len[hist]++;
+   }else{
+      v6_stat[hash].icmp_out.num++;
+
+      if(error)
+         v6_stat[hash].icmp_out.error++;
+
+      v6_stat[hash].icmp_out.len[hist]++;
+   }
+}
+
+void stat::update(const in6_addr* addr, int port, uint8_t proto, bool inOrOut, size_t len, bool error){
+   if(proto == IPPROTO_ICMP || proto == IPPROTO_ICMPV6){
+      warnx("invalid stat query");
+      return;
+   }
+
+   int hash = get_hash_index(addr, sizeof(in6_addr));
+   int hist = get_hist(len);
+   if(inOrOut && proto == IPPROTO_UDP){
+      v6_stat[hash].udp_in.num++;
+
+      if(error)
+         v6_stat[hash].udp_in.error++;
+
+      v6_stat[hash].udp_in.len[hist]++;
+
+   }else if(!inOrOut && proto == IPPROTO_UDP){
+      v6_stat[hash].udp_out.num++;
+
+      if(error)
+         v6_stat[hash].udp_out.error++;
+
+      v6_stat[hash].udp_out.len[hist]++;
+
+   }else if(inOrOut && proto == IPPROTO_TCP){
+       v6_stat[hash].tcp_in.num++;
+
+      if(error)
+         v6_stat[hash].tcp_in.error++;
+
+      v6_stat[hash].tcp_in.len[hist]++;
+
+  }else if(!inOrOut && proto == IPPROTO_TCP){
+       v6_stat[hash].tcp_out.num++;
+
+      if(error)
+         v6_stat[hash].tcp_out.error++;
+
+      v6_stat[hash].tcp_out.len[hist]++;
+
+  }else{
+      warnx("invalid stat query");
+   }
+ 
+}
+
+int stat::get_hash_index(const void *data, int data_len){
+   assert(data != NULL);
+   assert(data_len > 0);
+
+   uint16_t *datap = (uint16_t *)data;
+   data_len = data_len >> 1;
+   uint32_t sum = 0;
+   while(data_len--){
+      sum += *datap++;
+   }
+
+   return (sum % STAT_TABLE_HASH_SIZE);
+}
+
+int stat::get_hist(int len){
+   return 0;
+}
+
+void stat::send_info(int fd){
+   std::cout << "stat_::send_info() called." << std::endl;
+   std::string info;
+   std::map<int, stat_element>::iterator it = v4_stat.begin();
+   char ch[sizeof(uint64_t)];
+//   info.append("4to6\n");
+//   info.append("icmp in\n");
+
+   if(!v4_stat.empty()){
+      info.append("num: ");
+      sprintf(ch, "%llu", (*it).second.icmp_in.num);
+      info.append(ch);
+   }
+   
+//   write(fd, str.c_str(), sizeof(str.c_str()));
+   write(fd, info.c_str(), sizeof(info.c_str()));
+}
+
 }
