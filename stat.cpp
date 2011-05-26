@@ -53,9 +53,16 @@
 #include <net/if_dl.h>
 #include <net/if_tun.h>
 #endif
+#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/icmp6.h>
+
 
 #include "stat.h"
+#include "mapping.h"
 
 #include <iostream>
 #include <string>
@@ -87,152 +94,74 @@ int statif_alloc(){
    return stat_listen_fd;
 }
 
+int stat::update(const uint8_t *bufp, ssize_t len, uint8_t d){
+   assert(bufp != NULL);
 
-void stat::update(const in_addr* addr, uint8_t proto, bool inOrOut, size_t len, bool error){
-   if(proto != IPPROTO_ICMP){
-      warnx("invalid stat query");
-      return;
+   switch(d){
+      case FOURTOSIX:{
+         ip* ip4_hdrp = (ip*)bufp;
+         int hash = get_hash_index((const uint8_t*)&ip4_hdrp->ip_dst, sizeof(in_addr));
+         uint8_t ip4_proto = ip4_hdrp->ip_p;
+         if(ip4_proto == IPPROTO_ICMP){
+            stat_4to6[hash].icmp.num++;
+         }else if(ip4_proto == IPPROTO_TCP){
+            stat_4to6[hash].tcp.num++;
+         }else if(ip4_proto == IPPROTO_UDP){
+            stat_4to6[hash].udp.num++;
+         }
+         break;
+      }
+      case SIXTOFOUR:{
+         ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
+         in_addr service_addr;
+         if(mapping_convert_addrs_6to4(&ip6_hdrp->ip6_src, NULL, &service_addr, NULL) < 0)
+            break;
+         int hash = get_hash_index((const uint8_t*)&service_addr, sizeof(in_addr));
+         uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
+         if(ip6_proto == IPPROTO_ICMPV6){
+            stat_6to4[hash].icmp.num++;
+         }else if(ip6_proto == IPPROTO_TCP){
+            stat_6to4[hash].tcp.num++;
+         }else if(ip6_proto == IPPROTO_UDP){
+            stat_6to4[hash].udp.num++;
+         }
+         break;
+         }
+      case SIXTOSIX_GtoI:{
+         ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
+         int hash = get_hash_index((const uint8_t*)&ip6_hdrp->ip6_dst, sizeof(in6_addr));
+         uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
+         if(ip6_proto == IPPROTO_ICMPV6){
+            stat66_GtoI[hash].icmp.num++;
+         }else if(ip6_proto == IPPROTO_TCP){
+            stat66_GtoI[hash].tcp.num++;
+         }else if(ip6_proto == IPPROTO_UDP){
+            stat66_GtoI[hash].udp.num++;
+         }
+         break;
+      }
+      case SIXTOSIX_ItoG:{
+         ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
+         in6_addr service_addr;
+         if(mapping66_convert_addrs_ItoG(&ip6_hdrp->ip6_src, NULL, &service_addr, NULL) < 0)
+            break;
+         int hash = get_hash_index((const uint8_t*)&service_addr, sizeof(in6_addr));
+         uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
+         if(ip6_proto == IPPROTO_ICMPV6){
+            stat66_ItoG[hash].icmp.num++;
+         }else if(ip6_proto == IPPROTO_TCP){
+            stat66_ItoG[hash].tcp.num++;
+         }else if(ip6_proto == IPPROTO_UDP){
+            stat66_ItoG[hash].udp.num++;
+         }
+         break;
+      }
    }
-   
-   int hash = get_hash_index(addr, sizeof(in_addr));
-   int hist = get_hist(len);
 
-   if(inOrOut){
-      v4_stat[hash].icmp_in.num++;
-
-      if(error)
-         v4_stat[hash].icmp_in.error++;
-
-      v4_stat[hash].icmp_in.len[hist]++;
-   }else{
-      v4_stat[hash].icmp_out.num++;
-
-      if(error)
-         v4_stat[hash].icmp_out.error++;
-
-      v4_stat[hash].icmp_out.len[hist]++;
-   }
+   return 0;
 }
 
-void stat::update(const in_addr* addr, int port, uint8_t proto, bool inOrOut, size_t len, bool error){
-   if(proto == IPPROTO_ICMP || proto == IPPROTO_ICMPV6){
-      warnx("invalid stat query");
-      return;
-   }
-
-   int hash = get_hash_index(addr, sizeof(in_addr));
-   int hist = get_hist(len);
-   if(inOrOut && proto == IPPROTO_UDP){
-      v4_stat[hash].udp_in.num++;
-
-      if(error)
-         v4_stat[hash].udp_in.error++;
-
-      v4_stat[hash].udp_in.len[hist]++;
-
-   }else if(!inOrOut && proto == IPPROTO_UDP){
-      v4_stat[hash].udp_out.num++;
-
-      if(error)
-         v4_stat[hash].udp_out.error++;
-
-      v4_stat[hash].udp_out.len[hist]++;
-
-   }else if(inOrOut && proto == IPPROTO_TCP){
-       v4_stat[hash].tcp_in.num++;
-
-      if(error)
-         v4_stat[hash].tcp_in.error++;
-
-      v4_stat[hash].tcp_in.len[hist]++;
-
-  }else if(!inOrOut && proto == IPPROTO_TCP){
-       v4_stat[hash].tcp_out.num++;
-
-      if(error)
-         v4_stat[hash].tcp_out.error++;
-
-      v4_stat[hash].tcp_out.len[hist]++;
-
-  }else{
-      warnx("invalid stat query");
-   }
- 
-}
-
-void stat::update(const in6_addr* addr, uint8_t proto, bool inOrOut, size_t len, bool error){
-   if(proto != IPPROTO_ICMPV6){
-      warnx("invalid stat query");
-      return;
-   }
-
-   int hash = get_hash_index(addr, sizeof(in6_addr));
-   int hist = get_hist(len);
-
-   if(inOrOut){
-      v6_stat[hash].icmp_in.num;
-
-      if(error)
-         v6_stat[hash].icmp_in.error++;
-
-      v6_stat[hash].icmp_in.len[hist]++;
-   }else{
-      v6_stat[hash].icmp_out.num++;
-
-      if(error)
-         v6_stat[hash].icmp_out.error++;
-
-      v6_stat[hash].icmp_out.len[hist]++;
-   }
-}
-
-void stat::update(const in6_addr* addr, int port, uint8_t proto, bool inOrOut, size_t len, bool error){
-   if(proto == IPPROTO_ICMP || proto == IPPROTO_ICMPV6){
-      warnx("invalid stat query");
-      return;
-   }
-
-   int hash = get_hash_index(addr, sizeof(in6_addr));
-   int hist = get_hist(len);
-   if(inOrOut && proto == IPPROTO_UDP){
-      v6_stat[hash].udp_in.num++;
-
-      if(error)
-         v6_stat[hash].udp_in.error++;
-
-      v6_stat[hash].udp_in.len[hist]++;
-
-   }else if(!inOrOut && proto == IPPROTO_UDP){
-      v6_stat[hash].udp_out.num++;
-
-      if(error)
-         v6_stat[hash].udp_out.error++;
-
-      v6_stat[hash].udp_out.len[hist]++;
-
-   }else if(inOrOut && proto == IPPROTO_TCP){
-       v6_stat[hash].tcp_in.num++;
-
-      if(error)
-         v6_stat[hash].tcp_in.error++;
-
-      v6_stat[hash].tcp_in.len[hist]++;
-
-  }else if(!inOrOut && proto == IPPROTO_TCP){
-       v6_stat[hash].tcp_out.num++;
-
-      if(error)
-         v6_stat[hash].tcp_out.error++;
-
-      v6_stat[hash].tcp_out.len[hist]++;
-
-  }else{
-      warnx("invalid stat query");
-   }
- 
-}
-
-int stat::get_hash_index(const void *data, int data_len){
+int stat::get_hash_index(const uint8_t *data, size_t data_len){
    assert(data != NULL);
    assert(data_len > 0);
 
@@ -249,7 +178,7 @@ int stat::get_hash_index(const void *data, int data_len){
 int stat::get_hist(int len){
    return 0;
 }
-
+/*
 void stat::send_info(int fd){
    std::cout << "stat_::send_info() called." << std::endl;
    std::string info;
@@ -260,12 +189,12 @@ void stat::send_info(int fd){
 
    if(!v4_stat.empty()){
       info.append("num: ");
-      sprintf(ch, "%llu", (*it).second.icmp_in.num);
+      sprintf(ch, "%llu", (*it).second.icmp.num);
       info.append(ch);
    }
    
 //   write(fd, str.c_str(), sizeof(str.c_str()));
    write(fd, info.c_str(), sizeof(info.c_str()));
 }
-
+*/
 }

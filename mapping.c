@@ -338,17 +338,18 @@ mapping_convert_addrs_6to4(const struct in6_addr *ip6_src,
       struct in_addr *ip4_dst)
 {
    assert(ip6_src != NULL);
-   assert(ip6_dst != NULL);
    assert(ip4_src != NULL);
-   assert(ip4_dst != NULL);
+   assert((ip6_dst == NULL && ip4_dst == NULL)||(ip6_dst != NULL && ip4_dst != NULL));
 
    /*
     * IPv4 destination address comes from the lower 4 bytes of the IPv6
     * pseudo destination address.
     */
-   const uint8_t *ip4_of_ip6 = (const uint8_t *)ip6_dst;
-   ip4_of_ip6 += 12;
-   memcpy((void *)ip4_dst, (const void *)ip4_of_ip6, sizeof(struct in_addr));
+   if(ip4_dst != NULL){
+      const uint8_t *ip4_of_ip6 = (const uint8_t *)ip6_dst;
+      ip4_of_ip6 += 12;
+      memcpy((void *)ip4_dst, (const void *)ip4_of_ip6, sizeof(struct in_addr));
+   }
 
    /*
     * IPv4 psuedo source address is the associated address of the IPv6
@@ -424,9 +425,8 @@ mapping66_convert_addrs_ItoG(const struct in6_addr *ip6_before_src,
       struct in6_addr *ip6_after_dst)
 {
    assert(ip6_before_src != NULL);
-   assert(ip6_before_dst != NULL);
    assert(ip6_after_src != NULL);
-   assert(ip6_after_dst != NULL);
+   assert((ip6_before_dst == NULL && ip6_after_dst == NULL)||(ip6_before_dst != NULL && ip6_after_dst != NULL));
 
 
    const struct mapping66 *mappingp
@@ -441,7 +441,8 @@ mapping66_convert_addrs_ItoG(const struct in6_addr *ip6_before_src,
       warnx("from private network");
 #endif
       memcpy((void *)ip6_after_src, (const void *)&mappingp->global, sizeof(struct in6_addr));
-      memcpy((void *)ip6_after_dst, (const void *)ip6_before_dst, sizeof(struct in6_addr));
+      if(ip6_before_dst)
+         memcpy((void *)ip6_after_dst, (const void *)ip6_before_dst, sizeof(struct in6_addr));
    }else{
       /* 
        * no mapping exists

@@ -164,8 +164,8 @@ int main(int argc, char *argv[])
    }
 
    ssize_t read_len;
-   char buf[BUF_LEN];
-   char *bufp;
+   uint8_t buf[BUF_LEN];
+   uint8_t *bufp;
   
    /* MAIN WHILE LOOP */ 
    while(1)
@@ -179,10 +179,14 @@ int main(int argc, char *argv[])
       if(FD_ISSET(tun_fd, &fds)){
          
          read_len = read(tun_fd, (void *)buf, BUF_LEN);
-         bufp = buf;
+         bufp = (uint8_t* )buf;
          
-         uint32_t d = dispatch(bufp); 
+         uint8_t d = dispatch(bufp); 
          
+         if(stat.update(bufp, read_len, d) < 0){
+            warnx("failed to update stat");
+         }
+
          switch (d) {
             case FOURTOSIX:
                send_4to6(bufp, (size_t)read_len);
@@ -206,7 +210,7 @@ int main(int argc, char *argv[])
             warnx("failed to accept stat client");
             continue;
          }
-         stat.send_info(stat_fd);
+//         stat.send_info(stat_fd);
          close(stat_fd);
       }
    }

@@ -40,39 +40,38 @@ namespace map646_stat{
 
    class stat{
       public:
-         void update(const in_addr* addr, int port, uint8_t proto, bool inOrOut, size_t len, bool error);
-         void update(const in_addr* addr, uint8_t proto, bool inOrOut, size_t len, bool error);
-         void update(const in6_addr* addr, int port, uint8_t proto, bool inOrOut, size_t len, bool error);
-         void update(const in6_addr* addr, uint8_t proto, bool inOrOut, size_t len, bool error);
+         int update(const uint8_t *bufp, ssize_t len, uint8_t d);
+//         void send_info(int fd);
 
-         void send_info(int fd);
       private:
          int get_hist(int len);
-         int get_hash_index(const void *data, int data_len);
-         std::map<int, stat_element> v4_stat;
-         std::map<int, stat_element> v6_stat;
+         int get_hash_index(const uint8_t *data, size_t data_len);
+         std::map<int, stat_element> stat_4to6;
+         std::map<int, stat_element> stat_6to4;
+         std::map<int, stat_element> stat66_GtoI;
+         std::map<int, stat_element> stat66_ItoG;
   };
 
    struct stat_element{
-      struct icmp{
+      struct {
          uint64_t num;
          uint64_t error;
          uint64_t len[5];
-      }icmp_in, icmp_out;
+      }icmp;
       
-      struct tcp{
+      struct {
          uint64_t num;      
          uint64_t error;
          uint64_t len[5];
          std::map<int, uint64_t> port_stat;
-      }tcp_in, tcp_out;
+      }tcp;
       
-      struct udp{
+      struct {
          uint64_t num;
          uint64_t error;
          uint64_t len[5];
          std::map<int, uint64_t> port_stat;
-      }udp_in, udp_out;
+      }udp;
    };
 
 }
