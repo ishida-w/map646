@@ -60,141 +60,125 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
 
-
-#include "stat.h"
-#include "mapping.h"
-
 #include <iostream>
 #include <string>
 
+#include "mapping.h"
+#include "stat.h"
+
 namespace map646_stat{
+   int statif_alloc(){
+      int stat_listen_fd;   
+      sockaddr_un saddr;
 
-int statif_alloc(){
-   int stat_listen_fd;   
-   sockaddr_un saddr;
-   
-   if((stat_listen_fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
-      errx(EXIT_FAILURE, "failed to create stat socket");
-   }
+      if((stat_listen_fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
+         errx(EXIT_FAILURE, "failed to create stat socket");
+      }
 
-   memset((char *)&saddr, 0, sizeof(saddr));
+      memset((char *)&saddr, 0, sizeof(saddr));
 
-   saddr.sun_family = AF_UNIX;
-   strcpy(saddr.sun_path, STAT_SOCK);
+      saddr.sun_family = AF_UNIX;
+      strcpy(saddr.sun_path, STAT_SOCK);
 
-   unlink(STAT_SOCK);
-   if(bind(stat_listen_fd, (sockaddr *)&saddr, sizeof(saddr.sun_family) + strlen(STAT_SOCK)) < 0){
-      errx(EXIT_FAILURE, "failed to bind stat socket");
-   }
+      unlink(STAT_SOCK);
+      if(bind(stat_listen_fd, (sockaddr *)&saddr, sizeof(saddr.sun_family) + strlen(STAT_SOCK)) < 0){
+         errx(EXIT_FAILURE, "failed to bind stat socket");
+      }
 
-   if(listen(stat_listen_fd, 1) < 0){
+      if(listen(stat_listen_fd, 1) < 0){
          errx(EXIT_FAILURE, "failed to listen to stat socket");
-   }
-
-   return stat_listen_fd;
-}
-
-int stat::update(const uint8_t *bufp, ssize_t len, uint8_t d){
-   assert(bufp != NULL);
-
-   switch(d){
-      case FOURTOSIX:{
-         ip* ip4_hdrp = (ip*)bufp;
-         int hash = get_hash_index((const uint8_t*)&ip4_hdrp->ip_dst, sizeof(in_addr));
-         uint8_t ip4_proto = ip4_hdrp->ip_p;
-         if(ip4_proto == IPPROTO_ICMP){
-            stat_4to6[hash].icmp.num++;
-         }else if(ip4_proto == IPPROTO_TCP){
-            stat_4to6[hash].tcp.num++;
-         }else if(ip4_proto == IPPROTO_UDP){
-            stat_4to6[hash].udp.num++;
-         }
-         break;
       }
-      case SIXTOFOUR:{
-         ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
-         in_addr service_addr;
-         if(mapping_convert_addrs_6to4(&ip6_hdrp->ip6_src, NULL, &service_addr, NULL) < 0)
-            break;
-         int hash = get_hash_index((const uint8_t*)&service_addr, sizeof(in_addr));
-         uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
-         if(ip6_proto == IPPROTO_ICMPV6){
-            stat_6to4[hash].icmp.num++;
-         }else if(ip6_proto == IPPROTO_TCP){
-            stat_6to4[hash].tcp.num++;
-         }else if(ip6_proto == IPPROTO_UDP){
-            stat_6to4[hash].udp.num++;
-         }
-         break;
-         }
-      case SIXTOSIX_GtoI:{
-         ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
-         int hash = get_hash_index((const uint8_t*)&ip6_hdrp->ip6_dst, sizeof(in6_addr));
-         uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
-         if(ip6_proto == IPPROTO_ICMPV6){
-            stat66_GtoI[hash].icmp.num++;
-         }else if(ip6_proto == IPPROTO_TCP){
-            stat66_GtoI[hash].tcp.num++;
-         }else if(ip6_proto == IPPROTO_UDP){
-            stat66_GtoI[hash].udp.num++;
-         }
-         break;
+
+      return stat_listen_fd;
+   }
+   int stat::update(const uint8_t *bufp, ssize_t len, uint8_t d){
+      assert(bufp != NULL);
+
+      switch(d){
+         case FOURTOSIX:
+            {
+               ip* ip4_hdrp = (ip*)bufp;
+               map646_in_addr hash(ip4_hdrp->ip_dst);
+               uint8_t ip4_proto = ip4_hdrp->ip_p;
+               if(ip4_proto == IPPROTO_ICMP){
+                  stat_4to6[hash].icmp.num++;
+               }else if(ip4_proto == IPPROTO_TCP){
+                  stat_4to6[hash].tcp.num++;
+               }else if(ip4_proto == IPPROTO_UDP){
+                  stat_4to6[hash].udp.num++;
+               }
+               break;
+            }
+         case SIXTOFOUR:
+            {
+               ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
+               in_addr service_addr;
+               if(mapping_convert_addrs_6to4(&ip6_hdrp->ip6_src, NULL, &service_addr, NULL) < 0)
+                  break;
+               map646_in_addr hash(service_addr);
+               uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
+               if(ip6_proto == IPPROTO_ICMPV6){
+                  stat_6to4[hash].icmp.num++;
+               }else if(ip6_proto == IPPROTO_TCP){
+                  stat_6to4[hash].tcp.num++;
+               }else if(ip6_proto == IPPROTO_UDP){
+                  stat_6to4[hash].udp.num++;
+               }
+               break;
+            }
+         case SIXTOSIX_GtoI:
+            {
+               ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
+               map646_in6_addr hash(ip6_hdrp->ip6_dst);
+               uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
+               if(ip6_proto == IPPROTO_ICMPV6){
+                  stat66_GtoI[hash].icmp.num++;
+               }else if(ip6_proto == IPPROTO_TCP){
+                  stat66_GtoI[hash].tcp.num++;
+               }else if(ip6_proto == IPPROTO_UDP){
+                  stat66_GtoI[hash].udp.num++;
+               }
+               break;
+            }
+         case SIXTOSIX_ItoG:
+            {
+               ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
+               in6_addr service_addr;
+               if(mapping66_convert_addrs_ItoG(&ip6_hdrp->ip6_src, NULL, &service_addr, NULL) < 0)
+                  break;
+               map646_in6_addr hash(service_addr);
+               uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
+               if(ip6_proto == IPPROTO_ICMPV6){
+                  stat66_ItoG[hash].icmp.num++;
+               }else if(ip6_proto == IPPROTO_TCP){
+                  stat66_ItoG[hash].tcp.num++;
+               }else if(ip6_proto == IPPROTO_UDP){
+                  stat66_ItoG[hash].udp.num++;
+               }
+               break;
+            }
       }
-      case SIXTOSIX_ItoG:{
-         ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
-         in6_addr service_addr;
-         if(mapping66_convert_addrs_ItoG(&ip6_hdrp->ip6_src, NULL, &service_addr, NULL) < 0)
-            break;
-         int hash = get_hash_index((const uint8_t*)&service_addr, sizeof(in6_addr));
-         uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
-         if(ip6_proto == IPPROTO_ICMPV6){
-            stat66_ItoG[hash].icmp.num++;
-         }else if(ip6_proto == IPPROTO_TCP){
-            stat66_ItoG[hash].tcp.num++;
-         }else if(ip6_proto == IPPROTO_UDP){
-            stat66_ItoG[hash].udp.num++;
-         }
-         break;
+
+      return 0;
+   }
+
+   int stat::show(){
+      std::map<map646_in_addr, stat_element>::iterator it = stat_4to6.begin();
+
+      while(it != stat_4to6.end()){
+         char str[256];
+         inet_pton(AF_INET, str, (void *)&it->first.addr);
+         std::cout << "addr: " << str << std::endl;
+         std::cout << "icmp: ";
+         memset(str, 0, sizeof(str[256]));
+         sprintf(str, "%llu", it->second.icmp.num);
+         std::cout << "num: " << str << std::endl;
       }
+      return 0;
+
    }
 
-   return 0;
-}
-
-int stat::get_hash_index(const uint8_t *data, size_t data_len){
-   assert(data != NULL);
-   assert(data_len > 0);
-
-   uint16_t *datap = (uint16_t *)data;
-   data_len = data_len >> 1;
-   uint32_t sum = 0;
-   while(data_len--){
-      sum += *datap++;
+   int stat::get_hist(int len){
+      return 0;
    }
-
-   return (sum % STAT_TABLE_HASH_SIZE);
-}
-
-int stat::get_hist(int len){
-   return 0;
-}
-/*
-void stat::send_info(int fd){
-   std::cout << "stat_::send_info() called." << std::endl;
-   std::string info;
-   std::map<int, stat_element>::iterator it = v4_stat.begin();
-   char ch[sizeof(uint64_t)];
-//   info.append("4to6\n");
-//   info.append("icmp in\n");
-
-   if(!v4_stat.empty()){
-      info.append("num: ");
-      sprintf(ch, "%llu", (*it).second.icmp.num);
-      info.append(ch);
-   }
-   
-//   write(fd, str.c_str(), sizeof(str.c_str()));
-   write(fd, info.c_str(), sizeof(info.c_str()));
-}
-*/
 }

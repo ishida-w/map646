@@ -76,13 +76,12 @@ void reload_sighup(int);
 int tun_fd;
 int stat_listen_fd, stat_fd;
 
-map646_stat::stat stat;
-
 std::string map646_conf_path("/etc/map646.conf");
-
+map646_stat::stat stat;
 
 int main(int argc, char *argv[])
 {
+   
    /* Configuration path option */
    if(argc == 3){
       if(!strcmp("-c", argv[1])){
@@ -130,6 +129,9 @@ int main(int argc, char *argv[])
    socklen_t len;
   
    stat_listen_fd = map646_stat::statif_alloc();
+   if(stat_listen_fd == -1)
+      err(EXIT_FAILURE, "failed to open a stat interface"); 
+
 
    /* Set up pselect */
    fd_set fds, readfds;
@@ -179,13 +181,14 @@ int main(int argc, char *argv[])
       if(FD_ISSET(tun_fd, &fds)){
          
          read_len = read(tun_fd, (void *)buf, BUF_LEN);
-         bufp = (uint8_t* )buf;
+         bufp = buf;
+         bufp += sizeof(uint32_t);
+         uint8_t d = 2;
+//         uint8_t d = dispatch(bufp); 
          
-         uint8_t d = dispatch(bufp); 
-         
-         if(stat.update(bufp, read_len, d) < 0){
-            warnx("failed to update stat");
-         }
+//         if(stat.update(bufp, read_len, d) < 0){
+//            warnx("failed to update stat");
+//         }
 
          switch (d) {
             case FOURTOSIX:
@@ -210,7 +213,7 @@ int main(int argc, char *argv[])
             warnx("failed to accept stat client");
             continue;
          }
-//         stat.send_info(stat_fd);
+         stat.show();
          close(stat_fd);
       }
    }

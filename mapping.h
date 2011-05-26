@@ -54,7 +54,7 @@ int mapping66_convert_addrs_GtoI(const struct in6_addr *,
 			       struct in6_addr *,
 			       struct in6_addr *);
 int dispatch_6(const struct in6_addr *, const struct in6_addr *);
-uint32_t dispatch(void *);
+uint32_t dispatch(uint8_t *);
 int mapping_install_route(void);
 int mapping_uninstall_route(void);
 
