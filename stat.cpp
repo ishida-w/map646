@@ -93,7 +93,7 @@ namespace map646_stat{
    }
    int stat::update(const uint8_t *bufp, ssize_t len, uint8_t d){
       assert(bufp != NULL);
-
+      std::cout << "update: " << (int)d << std::endl;
       switch(d){
          case FOURTOSIX:
             {
@@ -164,15 +164,32 @@ namespace map646_stat{
 
    int stat::show(){
       std::map<map646_in_addr, stat_element>::iterator it = stat_4to6.begin();
-
       while(it != stat_4to6.end()){
-         char str[256];
-         inet_pton(AF_INET, str, (void *)&it->first.addr);
-         std::cout << "addr: " << str << std::endl;
+         std::cout << "4to6" << std::endl;
+         std::cout << "addr: " << it->first.get_addr() << std::endl;
          std::cout << "icmp: ";
-         memset(str, 0, sizeof(str[256]));
-         sprintf(str, "%llu", it->second.icmp.num);
-         std::cout << "num: " << str << std::endl;
+         printf("num: %llu\n", it->second.icmp.num);
+         std::cout << "tcp: ";
+         printf("num: %llu\n", it->second.tcp.num);
+         std::cout << "udp: ";
+         printf("num: %llu\n", it->second.udp.num);
+         it++;
+      }
+      
+      it = stat_6to4.begin();
+      while(it != stat_6to4.end()){
+         std::cout << "6to4" << std::endl;
+         std::cout << "addr: " << it->first.get_addr() << std::endl;
+         std::cout << "icmp: ";
+         printf("num: %llu\n", it->second.icmp.num);
+         it++;
+      }
+
+      std::map<map646_in6_addr, stat_element>::iterator it6 = stat66_GtoI.begin();
+      while(it6 != stat66_GtoI.begin()){
+         std::cout << "66_GtoI" << std::endl;
+         std::cout << "addr: " << it6->first.get_addr() << std::endl;
+
       }
       return 0;
 

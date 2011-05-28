@@ -65,6 +65,11 @@ namespace map646_stat{
       bool operator>(const map646_in_addr &rhs)const{
          return addr.s_addr > rhs.addr.s_addr;
       }
+      std::string get_addr()const{
+         char str[256];
+         inet_ntop(AF_INET, &addr, str, 64);
+         return std::string(str);
+      }
    };
 
    struct map646_in6_addr{
@@ -97,6 +102,12 @@ namespace map646_stat{
                return true;
          }
          return false;
+      }
+      std::string get_addr()const{
+         std::cout << "map646_in6_addr: get_addr()" << std::endl;
+         char str[256];
+         inet_ntop(AF_INET6, &addr, str, 256);
+         return std::string(str);
       }
    };
 

@@ -771,7 +771,7 @@ mapping66_insert_mapping(struct mapping66 *new_mappingp)
    return (0);
 }
 
-uint32_t dispatch(uint8_t *bufp){
+uint8_t dispatch(uint8_t *bufp){
    assert(bufp != NULL);
    uint32_t af = 0;
    af = tun_get_af(bufp);

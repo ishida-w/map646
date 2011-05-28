@@ -182,13 +182,12 @@ int main(int argc, char *argv[])
          
          read_len = read(tun_fd, (void *)buf, BUF_LEN);
          bufp = buf;
+         int d = dispatch(bufp);
          bufp += sizeof(uint32_t);
-         uint8_t d = 2;
-//         uint8_t d = dispatch(bufp); 
          
-//         if(stat.update(bufp, read_len, d) < 0){
-//            warnx("failed to update stat");
-//         }
+         if(stat.update(bufp, read_len, d) < 0){
+            warnx("failed to update stat");
+         }
 
          switch (d) {
             case FOURTOSIX:
