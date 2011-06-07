@@ -178,9 +178,14 @@ int main(int argc, char *argv[])
          errx(EXIT_FAILURE, "error from select");
       }
 
+      printf("test\n");
+
+
       if(FD_ISSET(tun_fd, &fds)){
+         printf("tun_fd test\n");
 
          read_len = read(tun_fd, (void *)buf, BUF_LEN);
+         std::cout<< read_len<< std::endl;
          bufp = buf;
          int d = dispatch(bufp);
          bufp += sizeof(uint32_t);
@@ -207,6 +212,7 @@ int main(int argc, char *argv[])
          }
       }
       if(FD_ISSET(stat_listen_fd, &fds)){
+         printf("stat test\n");
          if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
             warnx("failed to accept stat client");
             continue;
@@ -642,6 +648,7 @@ send_4to6(void *datap, size_t data_len)
       /* Send this (fragmented) packet. */
       ssize_t write_len;
       write_len = writev(tun_fd, iov, 4);
+      std::cout<< write_len << std::endl;
       if (write_len == -1) {
          warn("sending an IPv6 packet failed.");
       }
