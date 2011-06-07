@@ -38,7 +38,7 @@
 #include <sys/un.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-
+#include <sys/epoll.h>
 #include <net/if.h>
 
 #include <arpa/inet.h>
@@ -132,25 +132,24 @@ int main(int argc, char *argv[])
    if(stat_listen_fd == -1)
       err(EXIT_FAILURE, "failed to open a stat interface"); 
 
+   /* Set up epoll */
+   int epfd, nfiles = 2;
+   epoll_event *epevp;
+   if((epfd = epoll_create( nfiles )) == -1)
+      errx(EXIT_FAILURE, "epoll_create() failed");
 
-   /* Set up pselect */
-   fd_set fds, readfds;
-   int maxfd;
-   sigset_t sigset;
+   epevp = new epoll_event;
+   epevp->data.fd = tun_fd;
+   epevp->events = EPOLLIN;
+   if(epoll_ctl(epfd, EPOLL_CTL_ADD, tun_fd, epevp) == -1)
+      errx(EXIT_FAILURE, "epoll_ctl() failed");
 
-   FD_ZERO(&readfds);
-   FD_SET(tun_fd, &readfds);
-   FD_SET(stat_listen_fd, &readfds);
-
-   sigemptyset(&sigset);
-   sigaddset(&sigset, SIGHUP);
-
-   if(tun_fd > stat_listen_fd){
-      maxfd = tun_fd;
-   }else{
-      maxfd = stat_listen_fd;
-   }
-
+   epevp = new epoll_event;
+   epevp->data.fd = stat_listen_fd;
+   epevp->events = EPOLLIN;
+   if(epoll_ctl(epfd, EPOLL_CTL_ADD, stat_listen_fd, epevp) == -1)
+      errx(EXIT_FAILURE, "epoll_ctl() failed");
+   
    /* Create mapping table from the configuraion file. */
    if (mapping_create_table(map646_conf_path.c_str(), 0) == -1) {
       errx(EXIT_FAILURE, "mapping table creation failed.");
@@ -172,65 +171,62 @@ int main(int argc, char *argv[])
    /* MAIN WHILE LOOP */ 
    while(1)
    {
-      memcpy(&fds, &readfds, sizeof(fd_set));
+      int res;
+      int timeout = -1;
+      struct epoll_event events[nfiles];
+      if((res = epoll_wait(epfd, events, nfiles, timeout)) == -1)
+         errx(EXIT_FAILURE,"epoll_wait() failed ");
 
-      if(pselect(maxfd + 1, &fds, NULL, NULL, NULL, &sigset) == -1){
-         errx(EXIT_FAILURE, "error from select");
-      }
+      for(int i = 0; i < res; i++){
+         int fd = events[i].data.fd;
 
-      printf("test\n");
+         if(fd == tun_fd){
+            read_len = read(tun_fd, (void *)buf, BUF_LEN);
+            bufp = buf;
+            int d = dispatch(bufp);
+            bufp += sizeof(uint32_t);
 
+            if(stat.update(bufp, read_len, d) < 0){
+               warnx("failed to update stat");
+            }
 
-      if(FD_ISSET(tun_fd, &fds)){
-         printf("tun_fd test\n");
-
-         read_len = read(tun_fd, (void *)buf, BUF_LEN);
-         std::cout<< read_len<< std::endl;
-         bufp = buf;
-         int d = dispatch(bufp);
-         bufp += sizeof(uint32_t);
-
-         if(stat.update(bufp, read_len, d) < 0){
-            warnx("failed to update stat");
-         }
-
-         switch (d) {
-            case FOURTOSIX:
-               send_4to6(bufp, (size_t)read_len);
-               break;
-            case SIXTOFOUR:
-               send_6to4(bufp, (size_t)read_len);
-               break;
-            case SIXTOSIX_GtoI:
-               send66_GtoI(bufp, (size_t)read_len);
-               break;
-            case SIXTOSIX_ItoG:
-               send66_ItoG(bufp, (size_t)read_len);
-               break;
-            default:
-               warnx("unsupported mapping");
-         }
-      }
-      if(FD_ISSET(stat_listen_fd, &fds)){
-         printf("stat test\n");
-         if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
-            warnx("failed to accept stat client");
-            continue;
+            switch (d) {
+               case FOURTOSIX:
+                  send_4to6(bufp, (size_t)read_len);
+                  break;
+               case SIXTOFOUR:
+                  send_6to4(bufp, (size_t)read_len);
+                  break;
+               case SIXTOSIX_GtoI:
+                  send66_GtoI(bufp, (size_t)read_len);
+                  break;
+               case SIXTOSIX_ItoG:
+                  send66_ItoG(bufp, (size_t)read_len);
+                  break;
+               default:
+                  warnx("unsupported mapping");
+            }
          }
          
-         pid_t processID;
-         
-         if((processID = fork()) < 0){
-            warnx("failed to fork");
-            continue;
-         }else if(processID == 0){
-            close(stat_listen_fd);
-//            stat.mem_show();
-            stat.send(stat_fd);
-//            std::cout << stat.get_json() << std::endl;
-            exit(0);
+         if(fd == stat_listen_fd){
+            printf("stat test\n");
+            if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
+               warnx("failed to accept stat client");
+               continue;
+            }
+
+            pid_t processID;
+
+            if((processID = fork()) < 0){
+               warnx("failed to fork");
+               continue;
+            }else if(processID == 0){
+               close(stat_listen_fd);
+               stat.send(stat_fd);
+               exit(0);
+            }
+            close(stat_fd);
          }
-         close(stat_fd);
       }
    }
 
@@ -648,7 +644,6 @@ send_4to6(void *datap, size_t data_len)
       /* Send this (fragmented) packet. */
       ssize_t write_len;
       write_len = writev(tun_fd, iov, 4);
-      std::cout<< write_len << std::endl;
       if (write_len == -1) {
          warn("sending an IPv6 packet failed.");
       }
