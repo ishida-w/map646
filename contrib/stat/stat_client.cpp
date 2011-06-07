@@ -1,4 +1,5 @@
 #include <iostream>
+#include <string>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,15 +7,26 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/icmp6.h>
+
+#include "../../stat.h"
 
 #define STAT_SOCK "/tmp/map646_stat"
+
+using namespace map646_stat;
 
 main()
 {
    sockaddr_un addr;
    int fd;
    int len;
-   char buf[1024];
    int ret;
 
    ret = 1024;
@@ -33,12 +45,46 @@ main()
       perror("connect");
       exit(1);
    }
-   
-   while(ret = read(fd, buf, 1024)){
-      std::cout << buf << std::endl;
+
+   int n;
+   read(fd, (void *)&n, sizeof(int));
+   char buf[n+100];
+
+   read(fd, buf, n+10);
+
+   std::cout << buf << std::endl;
+  /* 
+   for(int i = 0; i < time; i++){
+      if(sizeof(map646_in_addr) == read(fd, buf, sizeof(map646_in_addr))){
+         map646_in_addr* addr = (map646_in_addr*)buf;
+         std::cout << addr->get_addr() << std::endl;
+      }else{
+         std::cout << "error handling" << std::endl;
+      }
+
+      if(sizeof(stat_chunk) == read(fd, buf, sizeof(stat_chunk))){
+         stat_chunk chunk;
+         chunk = *(stat_chunk *)buf;
+      }
+      
    }
+   read(fd, buf, sizeof(int));
 
+   time = *((int*)buf);
 
+   for(int i = 0; i < time; i++){
+      if(sizeof(map646_in6_addr) == read(fd, buf, sizeof(map646_in6_addr))){
+         map646_in6_addr* addr = (map646_in6_addr*)buf;
+         std::cout << addr->get_addr() << std::endl;
+      }else{
+         std::cout << "error handling" << std::endl;
+      }
 
+      if(sizeof(stat_element) == read(fd, buf, sizeof(stat_element))){
+         stat_element element;
+         element = *(stat_element *)buf;
+         std::cout << element.icmp_in.num << std::endl;
+      }
+   }
+*/
 }
-

@@ -81,7 +81,7 @@ map646_stat::stat stat;
 
 int main(int argc, char *argv[])
 {
-   
+
    /* Configuration path option */
    if(argc == 3){
       if(!strcmp("-c", argv[1])){
@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
    stat_fd = -1;
    sockaddr_un caddr;
    socklen_t len;
-  
+
    stat_listen_fd = map646_stat::statif_alloc();
    if(stat_listen_fd == -1)
       err(EXIT_FAILURE, "failed to open a stat interface"); 
@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
    ssize_t read_len;
    uint8_t buf[BUF_LEN];
    uint8_t *bufp;
-  
+
    /* MAIN WHILE LOOP */ 
    while(1)
    {
@@ -179,12 +179,12 @@ int main(int argc, char *argv[])
       }
 
       if(FD_ISSET(tun_fd, &fds)){
-         
+
          read_len = read(tun_fd, (void *)buf, BUF_LEN);
          bufp = buf;
          int d = dispatch(bufp);
          bufp += sizeof(uint32_t);
-         
+
          if(stat.update(bufp, read_len, d) < 0){
             warnx("failed to update stat");
          }
@@ -206,17 +206,28 @@ int main(int argc, char *argv[])
                warnx("unsupported mapping");
          }
       }
-
       if(FD_ISSET(stat_listen_fd, &fds)){
          if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
             warnx("failed to accept stat client");
             continue;
          }
-         stat.show();
+         
+         pid_t processID;
+         
+         if((processID = fork()) < 0){
+            warnx("failed to fork");
+            continue;
+         }else if(processID == 0){
+            close(stat_listen_fd);
+//            stat.mem_show();
+            stat.send(stat_fd);
+//            std::cout << stat.get_json() << std::endl;
+            exit(0);
+         }
          close(stat_fd);
       }
    }
-   
+
    /*
     * The program reaches here only when read(2) fails in the above
     * while loop. 
@@ -246,20 +257,25 @@ cleanup_sigint(int dummy)
    void
 cleanup(void)
 {
-   std::cout << "cleanup called" << std::endl;
-   if (tun_fd != -1) {
-      close(tun_fd);
-   }
-   if (stat_listen_fd != -1){
-      close(stat_listen_fd);
-   }
-   if (stat_fd != -1){
-      close(stat_fd);
-   }
+   if(getpid() == 0){
+      std::cout << "cleanup called" << std::endl;
+      if (mapping_uninstall_route() == -1) {
+         warnx("failed to uninstall route entries created before.  should we continue?");
+      }
+      if (tun_fd != -1) {
+         close(tun_fd);
+      }
+      if (stat_listen_fd != -1){
+         close(stat_listen_fd);
+      }
+      if (stat_fd != -1){
+         close(stat_fd);
+      }
 
 #if !defined(__linux__)
-   (void)tun_dealloc(tun_if_name);
+      (void)tun_dealloc(tun_if_name);
 #endif
+   }
 }
 
 /*

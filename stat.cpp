@@ -59,12 +59,16 @@
 #include <netinet/ip6.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
 
 #include <iostream>
 #include <string>
+#include <sstream>
 
 #include "mapping.h"
 #include "stat.h"
+#include "icmpsub.h"
 
 namespace map646_stat{
    int statif_alloc(){
@@ -91,52 +95,173 @@ namespace map646_stat{
 
       return stat_listen_fd;
    }
+
    int stat::update(const uint8_t *bufp, ssize_t len, uint8_t d){
       assert(bufp != NULL);
-      std::cout << "update: " << (int)d << std::endl;
       switch(d){
          case FOURTOSIX:
             {
                ip* ip4_hdrp = (ip*)bufp;
-               map646_in_addr hash(ip4_hdrp->ip_dst);
-               uint8_t ip4_proto = ip4_hdrp->ip_p;
-               if(ip4_proto == IPPROTO_ICMP){
-                  stat_4to6[hash].icmp.num++;
-               }else if(ip4_proto == IPPROTO_TCP){
-                  stat_4to6[hash].tcp.num++;
-               }else if(ip4_proto == IPPROTO_UDP){
-                  stat_4to6[hash].udp.num++;
+               
+               if(ip4_hdrp->ip_hl << 2 != sizeof(ip)){
+                  /* IPv4 options are not supported. */
+                  warnx("IPv4 options are not supported.");
+                  break;
                }
-               break;
+               
+               map646_in_addr addr(ip4_hdrp->ip_dst);
+               uint8_t ip4_proto = ip4_hdrp->ip_p;
+               uint16_t ip4_tlen, ip4_hlen, ip4_plen;
+               ip4_tlen = ntohs(ip4_hdrp->ip_len);
+               ip4_hlen = ip4_hdrp->ip_hl << 2;
+               ip4_plen = ip4_tlen - ip4_hlen;
+               uint8_t *packetp = (uint8_t *)ip4_hdrp;
+               packetp += sizeof(iphdr);
+
+               /* Check the packet size. */
+               if (ip4_tlen > len) {
+                  /* Data is too short.  Drop it. */
+                  warnx("Insufficient data supplied (%ld), while IP header says (%d)",
+                        len, ip4_tlen);
+                  break;
+               }
+               if(ip4_proto == IPPROTO_ICMP){
+                  stat[addr].stat_element[ICMP_IN].num++;
+                  stat[addr].stat_element[ICMP_IN].len[get_hist(ip4_plen - sizeof(icmp))]++;
+               }else if(ip4_proto == IPPROTO_TCP){
+                  
+                  stat[addr].stat_element[TCP_IN].num++;
+                  uint16_t source = ntohs(((tcphdr*)packetp)->source);
+                  stat[addr].stat_element[TCP_IN].port_stat[source]++;
+                  stat[addr].stat_element[TCP_IN].len[get_hist(ip4_plen - sizeof(tcphdr))]++;
+
+               }else if(ip4_proto == IPPROTO_UDP){
+                  
+                  stat[addr].stat_element[UDP_IN].num++;
+                  uint16_t source = ntohs(((udphdr*)packetp)->source);
+                  stat[addr].stat_element[UDP_IN].port_stat[source]++;
+                  stat[addr].stat_element[UDP_IN].len[get_hist(ip4_plen - sizeof(udphdr))]++;
+
+               }
+             break;
             }
          case SIXTOFOUR:
             {
                ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
                in_addr service_addr;
+               uint8_t *packetp = (uint8_t *)ip6_hdrp;
+               uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
+               packetp += sizeof(ip6_hdr);
+               
+               ip6_frag *ip6_frag_hdrp = NULL;
+               int ip6_more_frag = 0;
+               int ip6_offset = 0;
+               int ip6_id = 0;
+               
+               if (ip6_proto == IPPROTO_FRAGMENT) {
+                  ip6_frag_hdrp = (ip6_frag *)packetp;
+                  ip6_proto = ip6_frag_hdrp->ip6f_nxt;
+                  ip6_more_frag = ip6_frag_hdrp->ip6f_offlg & IP6F_MORE_FRAG;
+                  ip6_offset = ntohs(ip6_frag_hdrp->ip6f_offlg & IP6F_OFF_MASK);
+                  ip6_id = ntohl(ip6_frag_hdrp->ip6f_ident);
+                  packetp += sizeof(ip6_frag);
+               }
+               
+               if (ip6_proto != IPPROTO_ICMPV6
+                     && ip6_proto != IPPROTO_TCP
+                     && ip6_proto != IPPROTO_UDP) {
+                  warnx("Extention header %d is not supported.", ip6_proto);
+                  break;
+               }
+
                if(mapping_convert_addrs_6to4(&ip6_hdrp->ip6_src, NULL, &service_addr, NULL) < 0)
                   break;
-               map646_in_addr hash(service_addr);
-               uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
+               
+               map646_in_addr addr(service_addr);
+               uint16_t ip6_payload_len = ntohs(ip6_hdrp->ip6_plen);
+               if (ip6_frag_hdrp != NULL) {
+                  ip6_payload_len -= sizeof(ip6_frag);
+               }
+
+               /* Check the packet size. */
+               if (ip6_payload_len + sizeof(ip6_hdr) > len) {
+                  /* Data is too short.  Drop it. */
+                  warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+                        len, ip6_payload_len + sizeof(ip6_hdr));
+                  break;
+               }
+
                if(ip6_proto == IPPROTO_ICMPV6){
-                  stat_6to4[hash].icmp.num++;
+                  stat[addr].stat_element[ICMP_OUT].num++;
+                  stat[addr].stat_element[ICMP_OUT].len[get_hist(ip6_payload_len - sizeof(icmp6_hdr))]++;
                }else if(ip6_proto == IPPROTO_TCP){
-                  stat_6to4[hash].tcp.num++;
+                  stat[addr].stat_element[TCP_OUT].num++;
+                  u_int16_t source = ntohs(((tcphdr *)packetp)->source);
+                  stat[addr].stat_element[TCP_OUT].port_stat[source]++;
+                  stat[addr].stat_element[TCP_OUT].len[get_hist(ip6_payload_len - sizeof(tcphdr))]++;
                }else if(ip6_proto == IPPROTO_UDP){
-                  stat_6to4[hash].udp.num++;
+                  stat[addr].stat_element[UDP_OUT].num++;
+                  u_int16_t source = ntohs(((udphdr *)packetp)->source);
+                  stat[addr].stat_element[UDP_OUT].port_stat[source]++;
+                  stat[addr].stat_element[UDP_OUT].len[get_hist(ip6_payload_len - sizeof(udphdr))]++;
                }
                break;
             }
          case SIXTOSIX_GtoI:
             {
                ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
-               map646_in6_addr hash(ip6_hdrp->ip6_dst);
+               map646_in6_addr addr(ip6_hdrp->ip6_dst);
+               uint8_t *packetp = (uint8_t *)ip6_hdrp;
                uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
+               packetp += sizeof(ip6_hdr);
+ 
+               ip6_frag *ip6_frag_hdrp = NULL;
+               int ip6_more_frag = 0;
+               int ip6_offset = 0;
+               int ip6_id = 0;
+               
+               if (ip6_proto == IPPROTO_FRAGMENT) {
+                  ip6_frag_hdrp = (ip6_frag *)packetp;
+                  ip6_proto = ip6_frag_hdrp->ip6f_nxt;
+                  ip6_more_frag = ip6_frag_hdrp->ip6f_offlg & IP6F_MORE_FRAG;
+                  ip6_offset = ntohs(ip6_frag_hdrp->ip6f_offlg & IP6F_OFF_MASK);
+                  ip6_id = ntohl(ip6_frag_hdrp->ip6f_ident);
+                  packetp += sizeof(ip6_frag);
+               }
+               
+               if (ip6_proto != IPPROTO_ICMPV6
+                     && ip6_proto != IPPROTO_TCP
+                     && ip6_proto != IPPROTO_UDP) {
+                  warnx("Extention header %d is not supported.", ip6_proto);
+                  break;
+               }
+               
+               uint16_t ip6_payload_len = ntohs(ip6_hdrp->ip6_plen);
+               if (ip6_frag_hdrp != NULL) {
+                  ip6_payload_len -= sizeof(ip6_frag);
+               }
+
+               /* Check the packet size. */
+               if (ip6_payload_len + sizeof(ip6_hdr) > len) {
+                  /* Data is too short.  Drop it. */
+                  warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+                        len, ip6_payload_len + sizeof(ip6_hdr));
+                  break;
+               }
+
                if(ip6_proto == IPPROTO_ICMPV6){
-                  stat66_GtoI[hash].icmp.num++;
+                  stat66[addr].stat_element[ICMP_IN].num++;
+                  stat66[addr].stat_element[ICMP_IN].len[get_hist(ip6_payload_len - sizeof(icmp6_hdr))]++;
                }else if(ip6_proto == IPPROTO_TCP){
-                  stat66_GtoI[hash].tcp.num++;
+                  stat66[addr].stat_element[TCP_IN].num++;
+                  u_int16_t source = ntohs(((tcphdr *)packetp)->source);
+                  stat66[addr].stat_element[TCP_IN].port_stat[source]++;
+                  stat66[addr].stat_element[TCP_IN].len[get_hist(ip6_payload_len - sizeof(tcphdr))]++;
                }else if(ip6_proto == IPPROTO_UDP){
-                  stat66_GtoI[hash].udp.num++;
+                  stat66[addr].stat_element[UDP_IN].num++;
+                  u_int16_t source = ntohs(((udphdr *)packetp)->source);
+                  stat66[addr].stat_element[UDP_IN].port_stat[source]++;
+                  stat66[addr].stat_element[UDP_IN].len[get_hist(ip6_payload_len - sizeof(udphdr))]++;
                }
                break;
             }
@@ -144,18 +269,64 @@ namespace map646_stat{
             {
                ip6_hdr* ip6_hdrp = (ip6_hdr*)bufp;
                in6_addr service_addr;
+               uint8_t *packetp = (uint8_t *)ip6_hdrp;
+               uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
+               packetp += sizeof(ip6_hdr);
+               
+               ip6_frag *ip6_frag_hdrp = NULL;
+               int ip6_more_frag = 0;
+               int ip6_offset = 0;
+               int ip6_id = 0;
+               
+               if (ip6_proto == IPPROTO_FRAGMENT) {
+                  ip6_frag_hdrp = (ip6_frag *)packetp;
+                  ip6_proto = ip6_frag_hdrp->ip6f_nxt;
+                  ip6_more_frag = ip6_frag_hdrp->ip6f_offlg & IP6F_MORE_FRAG;
+                  ip6_offset = ntohs(ip6_frag_hdrp->ip6f_offlg & IP6F_OFF_MASK);
+                  ip6_id = ntohl(ip6_frag_hdrp->ip6f_ident);
+                  packetp += sizeof(ip6_frag);
+               }
+               
+               if (ip6_proto != IPPROTO_ICMPV6
+                     && ip6_proto != IPPROTO_TCP
+                     && ip6_proto != IPPROTO_UDP) {
+                  warnx("Extention header %d is not supported.", ip6_proto);
+                  break;
+               }
+
+
                if(mapping66_convert_addrs_ItoG(&ip6_hdrp->ip6_src, NULL, &service_addr, NULL) < 0)
                   break;
-               map646_in6_addr hash(service_addr);
-               uint8_t ip6_proto =  ip6_hdrp->ip6_nxt;
-               if(ip6_proto == IPPROTO_ICMPV6){
-                  stat66_ItoG[hash].icmp.num++;
-               }else if(ip6_proto == IPPROTO_TCP){
-                  stat66_ItoG[hash].tcp.num++;
-               }else if(ip6_proto == IPPROTO_UDP){
-                  stat66_ItoG[hash].udp.num++;
+               map646_in6_addr addr(service_addr);
+               uint16_t ip6_payload_len = ntohs(ip6_hdrp->ip6_plen);
+               if (ip6_frag_hdrp != NULL) {
+                  ip6_payload_len -= sizeof(ip6_frag);
                }
-               break;
+
+               /* Check the packet size. */
+               if (ip6_payload_len + sizeof(ip6_hdr) > len) {
+                  /* Data is too short.  Drop it. */
+                  warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+                        len, ip6_payload_len + sizeof(ip6_hdr));
+                  break;
+               }
+
+
+               if(ip6_proto == IPPROTO_ICMPV6){
+                  stat66[addr].stat_element[ICMP_OUT].num++;
+                  stat66[addr].stat_element[ICMP_OUT].len[get_hist(ip6_payload_len - sizeof(icmp6_hdr))]++;
+               }else if(ip6_proto == IPPROTO_TCP){
+                  stat66[addr].stat_element[TCP_OUT].num++;
+                  u_int16_t source = ntohs(((tcphdr *)packetp)->source);
+                  stat66[addr].stat_element[TCP_OUT].port_stat[source]++;
+                  stat66[addr].stat_element[TCP_OUT].len[get_hist(ip6_payload_len - sizeof(tcphdr))]++;
+               }else if(ip6_proto == IPPROTO_UDP){
+                  stat66[addr].stat_element[UDP_OUT].num++;
+                  u_int16_t source = ntohs(((udphdr *)packetp)->source);
+                  stat66[addr].stat_element[UDP_OUT].port_stat[source]++;
+                  stat66[addr].stat_element[UDP_OUT].len[get_hist(ip6_payload_len - sizeof(udphdr))]++;
+               }
+              break;
             }
       }
 
@@ -163,39 +334,197 @@ namespace map646_stat{
    }
 
    int stat::show(){
-      std::map<map646_in_addr, stat_element>::iterator it = stat_4to6.begin();
-      while(it != stat_4to6.end()){
+      std::map<map646_in_addr, stat_chunk>::iterator it = stat.begin();
+      std::cout << "STAT" << std::endl; 
+      while(it != stat.end()){
          std::cout << "4to6" << std::endl;
-         std::cout << "addr: " << it->first.get_addr() << std::endl;
-         std::cout << "icmp: ";
-         printf("num: %llu\n", it->second.icmp.num);
-         std::cout << "tcp: ";
-         printf("num: %llu\n", it->second.tcp.num);
-         std::cout << "udp: ";
-         printf("num: %llu\n", it->second.udp.num);
-         it++;
-      }
-      
-      it = stat_6to4.begin();
-      while(it != stat_6to4.end()){
-         std::cout << "6to4" << std::endl;
-         std::cout << "addr: " << it->first.get_addr() << std::endl;
-         std::cout << "icmp: ";
-         printf("num: %llu\n", it->second.icmp.num);
+         std::cout << " service addr: " << it->first.get_addr() << std::endl;
+         
+         for(int i = 0; i < 6; i++){
+            std::cout << "  " << get_proto(i) << ": " << std::endl;
+            std::cout << "   num = " << it->second.stat_element[i].num << std::endl;
+            for(int j = 0; j < 11; j++){
+               uint64_t len =  it->second.stat_element[i].len[j];
+               if(len != 0)
+                  std::cout << "   len[" << j << "] = " << len << std::endl;
+            }
+            if(!it->second.stat_element[i].port_stat.empty()){
+               std::map<int, int64_t>::iterator port_it = it->second.stat_element[i].port_stat.begin();
+               while(port_it != it->second.stat_element[i].port_stat.end()){
+                  std::cout << "    " << port_it->first << " = " << port_it->second << std::endl;
+                  port_it++;
+               }
+            }
+         }
+         
          it++;
       }
 
-      std::map<map646_in6_addr, stat_element>::iterator it6 = stat66_GtoI.begin();
-      while(it6 != stat66_GtoI.begin()){
-         std::cout << "66_GtoI" << std::endl;
-         std::cout << "addr: " << it6->first.get_addr() << std::endl;
+      std::map<map646_in6_addr, stat_chunk>::iterator it6 = stat66.begin();
+      while(it6 != stat66.end()){
+         std::cout << "6to6" << std::endl;
+         std::cout << " service addr: " << it6->first.get_addr() << std::endl;
 
+         for(int i = 0; i < 6; i++){
+            std::cout << "  " << get_proto(i) << ": " << std::endl;
+            std::cout << "   num = " << it6->second.stat_element[i].num << std::endl;
+            for(int j = 0; j < 11; j++){
+               uint64_t len =  it6->second.stat_element[i].len[j];
+               if(len != 0)
+                  std::cout << "   len[" << j << "] = " << len << std::endl;
+            }
+            if(!it6->second.stat_element[i].port_stat.empty()){
+               std::map<int, int64_t>::iterator port_it = it6->second.stat_element[i].port_stat.begin();
+               std::cout << "   port: " << std::endl;
+               while(port_it != it6->second.stat_element[i].port_stat.end()){
+                  std::cout << "    " << port_it->first << " = " << port_it->second << std::endl;
+                  port_it++;
+               }
+            }
+         }
+
+         it6++;
       }
+
       return 0;
 
+   }
+   
+   int stat::send(int fd){
+      std::string message = get_json();
+      int size = message.size();
+      write(fd, (uint8_t *)&size, sizeof(int));
+      write(fd, message.c_str(), size);
+
+      return 0;
+   }
+
+   std::string stat::get_json(){
+      
+      std::stringstream json;
+      json << "{" << "\"map646-stat\"" << ":";
+     
+      json << "{\"v4\"" << ":"; 
+      if(stat.empty())
+         json << "null";
+      std::map<map646_in_addr, stat_chunk>::iterator it = stat.begin();
+
+      while(it != stat.end()){
+         if(it != stat.begin())
+            json << ",";
+         json << "{" << "\"" << it->first.get_addr() << "\":"; 
+        
+         json << "{"; 
+         for(int i = 0; i < 6; i++){
+            if(i != 0)
+               json << ",";
+            json << "\"" << get_proto(i) << "\":";
+            json << "{" << make_json_object("num", it->second.stat_element[i].num) << ",";
+            json << make_json_object("len", len_output(it->second.stat_element[i].len)) << ",";
+            json << make_json_object("port", port_output(it->second.stat_element[i].port_stat)) << "}";
+         }
+
+         json << "}";
+         json << "}";
+         
+         it++;
+      }
+
+      json << "," << "\"v6\"" << ":"; 
+      if(stat66.empty())
+         json << "null";
+      std::map<map646_in6_addr, stat_chunk>::iterator it6 = stat66.begin();
+
+      while(it6 != stat66.end()){
+         if(it6 != stat66.begin())
+            json << ",";
+         json << "{" << "\"" << it6->first.get_addr() << "\":"; 
+        
+         json << "{"; 
+         for(int i = 0; i < 6; i++){
+            if(i != 0)
+               json << ",";
+            json << "\"" << get_proto(i) << "\":";
+            json << "{" << make_json_object("num", it6->second.stat_element[i].num) << ",";
+            json << make_json_object("len", len_output(it6->second.stat_element[i].len)) << ",";
+            json << make_json_object("port", port_output(it6->second.stat_element[i].port_stat)) << "}";
+         }
+
+         json << "}";
+         json << "}";
+         
+         it6++;
+      }
+   
+      json << "}";
+      json << "}";
+      return json.str();
    }
 
    int stat::get_hist(int len){
-      return 0;
+      int ret = len / 150;
+      if(ret > 10)
+         ret = 10;
+      return ret;
    }
+
+   std::string stat::get_proto(int proto){
+      if(proto == 0){
+         return std::string("icmp_in");
+      }else if(proto == 1){
+         return std::string("icmp_out");
+      }else if(proto == 2){
+         return std::string("tcp_in");
+      }else if(proto == 3){
+         return std::string("tcp_out");
+      }else if(proto == 4){
+         return std::string("udp_in");
+      }else if(proto == 5){
+         return std::string("udp_out");
+      }else{
+         return std::string("unknown proto");
+      }
+   }
+
+   std::string stat::make_json_object(const char* key, const std::string &value){
+      std::stringstream ss;
+      ss << "\"" << key << "\":" << value;
+      return ss.str();
+   }
+  
+   std::string stat::make_json_object(const char* key, const uint64_t value){
+      std::stringstream ss;
+      ss << "\"" << key << "\":" << value;
+      return ss.str();
+   }
+   
+   std::string stat::len_output(const uint64_t *len){
+      std::stringstream ss;
+      ss << "[";
+      for(int i = 0; i < 11; i++){
+         if(i != 0)
+            ss << ",";
+         ss << len[i];
+      }
+      ss << "]";
+
+      return ss.str();
+   }
+
+   std::string stat::port_output(std::map<int,int64_t> &port_stat){
+      if(port_stat.empty())
+         return "null";
+      std::stringstream ss;
+      ss << "{";
+      std::map<int, int64_t>::iterator it = port_stat.begin();
+      while(it != port_stat.end()){
+         if(it != port_stat.begin())
+            ss << ",";
+         ss << "\"" << it->first << "\":" << it->second;
+         it++;
+      }
+      ss << "}";
+      return ss.str();
+   }
+
 }

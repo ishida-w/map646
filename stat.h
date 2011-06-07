@@ -29,26 +29,22 @@ namespace map646_stat{
 
    int statif_alloc();
 
-   struct stat_element{
-      struct {
-         uint64_t num;
-         uint64_t error;
-         uint64_t len[5];
-      }icmp;
+   struct stat_chunk{
 
-      struct {
+#define ICMP_IN  0
+#define ICMP_OUT 1
+#define TCP_IN   2
+#define TCP_OUT  3
+#define UDP_IN   4
+#define UDP_OUT  5
+
+      struct stat_element_{
          uint64_t num;      
          uint64_t error;
-         uint64_t len[5];
-         std::map<int, uint64_t> port_stat;
-      }tcp;
+         uint64_t len[11];
+         std::map<int, int64_t> port_stat;
+      }stat_element[6];
 
-      struct {
-         uint64_t num;
-         uint64_t error;
-         uint64_t len[5];
-         std::map<int, uint64_t> port_stat;
-      }udp;
    };
 
    struct map646_in_addr{
@@ -104,23 +100,27 @@ namespace map646_stat{
          return false;
       }
       std::string get_addr()const{
-         std::cout << "map646_in6_addr: get_addr()" << std::endl;
          char str[256];
          inet_ntop(AF_INET6, &addr, str, 256);
          return std::string(str);
       }
    };
 
-
    class stat{
       public:
          int update(const uint8_t *bufp, ssize_t len, uint8_t d);
          int show();
+         std::string get_json();
+         int send(int fd);
+         int mem_show();
       private:
          int get_hist(int len);
-         std::map<map646_in_addr, stat_element> stat_4to6;
-         std::map<map646_in_addr, stat_element> stat_6to4;
-         std::map<map646_in6_addr, stat_element> stat66_GtoI;
-         std::map<map646_in6_addr, stat_element> stat66_ItoG;
+         std::string make_json_object(const char* key, const std::string &value);
+         std::string make_json_object(const char* key, const uint64_t value);
+         std::string port_output(std::map<int, int64_t> &port_stat);
+         std::string len_output(const uint64_t *len);
+         std::string get_proto(int proto);
+         std::map<map646_in_addr, stat_chunk> stat;
+         std::map<map646_in6_addr, stat_chunk> stat66;
    };
 }
