@@ -30,7 +30,7 @@
 #include <err.h>
 #include <errno.h>
 #include <unistd.h>
-
+#include <fcntl.h>
 #include <iostream>
 #include <string>
 
@@ -77,7 +77,7 @@ int tun_fd;
 int stat_listen_fd, stat_fd;
 
 std::string map646_conf_path("/etc/map646.conf");
-map646_stat::stat stat;
+map646_stat::stat map_stat;
 
 int main(int argc, char *argv[])
 {
@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
             int d = dispatch(bufp);
             bufp += sizeof(uint32_t);
 
-            if(stat.update(bufp, read_len, d) < 0){
+            if(map_stat.update(bufp, read_len, d) < 0){
                warnx("failed to update stat");
             }
 
@@ -207,12 +207,8 @@ int main(int argc, char *argv[])
                   warnx("unsupported mapping");
             }
          }
-         
+
          if(fd == stat_listen_fd){
-            if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
-               warnx("failed to accept stat client");
-               continue;
-            }
 
             pid_t processID;
 
@@ -221,11 +217,12 @@ int main(int argc, char *argv[])
                continue;
             }else if(processID == 0){
                close(stat_listen_fd);
-               stat.send(stat_fd);
+               map_stat.send(stat_fd);
                exit(0);
             }
             close(stat_fd);
          }
+
       }
    }
 

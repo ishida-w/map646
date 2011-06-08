@@ -45,7 +45,6 @@ main()
       perror("connect");
       exit(1);
    }
-
    int n;
    read(fd, (void *)&n, sizeof(int));
    char buf[n+100];
@@ -53,38 +52,5 @@ main()
    read(fd, buf, n+10);
 
    std::cout << buf << std::endl;
-  /* 
-   for(int i = 0; i < time; i++){
-      if(sizeof(map646_in_addr) == read(fd, buf, sizeof(map646_in_addr))){
-         map646_in_addr* addr = (map646_in_addr*)buf;
-         std::cout << addr->get_addr() << std::endl;
-      }else{
-         std::cout << "error handling" << std::endl;
-      }
 
-      if(sizeof(stat_chunk) == read(fd, buf, sizeof(stat_chunk))){
-         stat_chunk chunk;
-         chunk = *(stat_chunk *)buf;
-      }
-      
-   }
-   read(fd, buf, sizeof(int));
-
-   time = *((int*)buf);
-
-   for(int i = 0; i < time; i++){
-      if(sizeof(map646_in6_addr) == read(fd, buf, sizeof(map646_in6_addr))){
-         map646_in6_addr* addr = (map646_in6_addr*)buf;
-         std::cout << addr->get_addr() << std::endl;
-      }else{
-         std::cout << "error handling" << std::endl;
-      }
-
-      if(sizeof(stat_element) == read(fd, buf, sizeof(stat_element))){
-         stat_element element;
-         element = *(stat_element *)buf;
-         std::cout << element.icmp_in.num << std::endl;
-      }
-   }
-*/
 }
