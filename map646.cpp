@@ -209,7 +209,6 @@ int main(int argc, char *argv[])
          }
          
          if(fd == stat_listen_fd){
-            printf("stat test\n");
             if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
                warnx("failed to accept stat client");
                continue;
@@ -259,6 +258,7 @@ cleanup_sigint(int dummy)
    void
 cleanup(void)
 {
+      std::cout << "cleanup called" << std::endl;
    if(getpid() == 0){
       std::cout << "cleanup called" << std::endl;
       if (mapping_uninstall_route() == -1) {
@@ -275,7 +275,7 @@ cleanup(void)
       }
 
 #if !defined(__linux__)
-      (void)tun_dealloc(tun_if_name);
+     (void)tun_dealloc(tun_if_name);
 #endif
    }
 }

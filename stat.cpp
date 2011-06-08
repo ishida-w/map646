@@ -66,6 +66,8 @@
 #include <string>
 #include <sstream>
 
+#include <json/json.h>
+
 #include "mapping.h"
 #include "stat.h"
 #include "icmpsub.h"
@@ -330,6 +332,8 @@ namespace map646_stat{
             }
       }
 
+      std::cout << get_json() << std::endl;
+
       return 0;
    }
 
@@ -392,13 +396,58 @@ namespace map646_stat{
    
    int stat::send(int fd){
       std::string message = get_json();
+      std::cout << get_json();
       int size = message.size();
-      write(fd, (uint8_t *)&size, sizeof(int));
-      write(fd, message.c_str(), size);
+//      write(fd, (uint8_t *)&size, sizeof(int));
+//      write(fd, message.c_str(), size);
 
       return 0;
    }
 
+   std::string stat::get_json(){
+      json_object *jobj = json_object_new_object();
+      
+      if(stat.empty())
+         json_object_object_add(jobj, "v4", NULL);
+      else{
+         std::map<map646_in_addr, stat_chunk>::iterator it = stat.begin();
+         json_object *v4 = json_object_new_object();
+
+         while(it != stat.end()){
+            for(int i = 0; i < 6; i++){
+               json_object *element = json_object_new_object();
+               
+               json_object *num = json_object_new_int(it->second.stat_element[i].num);
+               json_object_object_add(element, "num", num);
+
+               json_object *len = json_object_new_array();
+               for(int j = 0; j < 11; j++){
+                  json_object_array_add(len, json_object_new_int(it->second.stat_element[i].len[j]));
+               }
+               json_object_object_add(element, "len", len);
+
+               if(it->second.stat_element[i].port_stat.empty()){
+                  json_object_object_add(element, "port", NULL);
+               }else{
+                  std::map<int, int64_t>::iterator port_it = it->second.stat_element[i].port_stat.begin();
+                  json_object *port = json_object_new_object();
+                  while(port_it != it->second.stat_element[i].port_stat.end()){
+                     std::stringstream ss;
+                     ss << port_it->first;
+                     std::string s = ss.str();
+                     json_object_object_add(port,s.c_str(), json_object_new_int(port_it->second));
+                  }
+                  json_object_object_add(element, "port", port);
+               }
+               json_object_object_add(v4, (it->first.get_addr()).c_str(), element);
+            }
+         }
+      }
+
+      return json_object_to_json_string(jobj);
+   }
+   
+   /*
    std::string stat::get_json(){
       
       std::stringstream json;
@@ -460,7 +509,7 @@ namespace map646_stat{
       json << "}";
       return json.str();
    }
-
+   */
    int stat::get_hist(int len){
       int ret = len / 150;
       if(ret > 10)
