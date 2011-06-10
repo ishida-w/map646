@@ -206,9 +206,7 @@ int main(int argc, char *argv[])
                default:
                   warnx("unsupported mapping");
             }
-         }
-
-         if(fd == stat_listen_fd){
+         }else if(fd == stat_listen_fd){
             if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
                warnx("failed to accept stat client");
                continue;
@@ -219,10 +217,31 @@ int main(int argc, char *argv[])
             epevp->events = EPOLLIN;
             if(epoll_ctl(epfd, EPOLL_CTL_ADD, stat_fd, epevp) == -1)
                warnx("epoll_ctr failed()");
+         }else{
+            const int COMMAND_SIZE = 100;
+            char command[COMMAND_SIZE];
+            if(read(fd, command, COMMAND_SIZE) < 0){
+               warnx("read() faild");
+            }else{
+               if(strcmp(command, "send") == 0){
+                  map_stat.show();
+                  map_stat.send(stat_fd);
+               }else if(strcmp(command, "flush") == 0){
+                  map_stat.show();
+                  map_stat.flush();
+               }else if(strcmp(command, "quit") == 0){
+                  epoll_event epev;
+                  epev.data.fd = fd;
+                  if(epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &epev) == -1){
+                     perror("epoll_ctl() EPOLL_CTL_DEL failed");
+                  }
+                  close(fd);
+               }else{
+                  warnx("unknown stat command");
+               }
+            }
          }
 
-         if(fd == stat_fd){
-         }
 /*
  
             pid_t processID;

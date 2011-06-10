@@ -68,6 +68,7 @@ main()
       }else if(command == "flush"){
          write(fd, "flush", sizeof("flush"));
       }else if(command == "quit"){
+         write(fd, "quit", sizeof("quit"));
          std::cout << "bye" <<std::endl;
          exit(0);
       }else{
