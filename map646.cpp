@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
       err(EXIT_FAILURE, "failed to open a stat interface"); 
 
    /* Set up epoll */
-   int epfd, nfiles = 2;
+   int epfd, nfiles = 10;
    epoll_event *epevp;
    if((epfd = epoll_create( nfiles )) == -1)
       errx(EXIT_FAILURE, "epoll_create() failed");
@@ -209,7 +209,22 @@ int main(int argc, char *argv[])
          }
 
          if(fd == stat_listen_fd){
+            if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
+               warnx("failed to accept stat client");
+               continue;
+            }
 
+            epevp = new epoll_event;
+            epevp->data.fd = stat_fd;
+            epevp->events = EPOLLIN;
+            if(epoll_ctl(epfd, EPOLL_CTL_ADD, stat_fd, epevp) == -1)
+               warnx("epoll_ctr failed()");
+         }
+
+         if(fd == stat_fd){
+         }
+/*
+ 
             pid_t processID;
 
             if((processID = fork()) < 0){
@@ -217,11 +232,24 @@ int main(int argc, char *argv[])
                continue;
             }else if(processID == 0){
                close(stat_listen_fd);
-               map_stat.send(stat_fd);
+               const int COMMAND_SIZE = 100;
+               char command[COMMAND_SIZE];
+               if(read(stat_fd, command, COMMAND_SIZE) < 0){
+                  warnx("read() failed");
+               }else{
+                  if(strcmp(command, "send") == 0){
+                     map_stat.show();
+                     map_stat.send(stat_fd);
+                  }else if(strcmp(command, "flush") == 0){
+                     map_stat.show();
+                     map_stat.flush();
+                  }else{
+                     warnx("unknown stat command");
+                  }
+               }
                exit(0);
             }
-            close(stat_fd);
-         }
+*/
 
       }
    }
@@ -255,26 +283,25 @@ cleanup_sigint(int dummy)
    void
 cleanup(void)
 {
-      std::cout << "cleanup called" << std::endl;
    if(getpid() == 0){
       std::cout << "cleanup called" << std::endl;
       if (mapping_uninstall_route() == -1) {
          warnx("failed to uninstall route entries created before.  should we continue?");
       }
-      if (tun_fd != -1) {
-         close(tun_fd);
-      }
-      if (stat_listen_fd != -1){
-         close(stat_listen_fd);
-      }
-      if (stat_fd != -1){
-         close(stat_fd);
-      }
+   }
+   if (tun_fd != -1) {
+      close(tun_fd);
+   }
+   if (stat_listen_fd != -1){
+      close(stat_listen_fd);
+   }
+   if (stat_fd != -1){
+      close(stat_fd);
+   }
 
 #if !defined(__linux__)
-     (void)tun_dealloc(tun_if_name);
+   (void)tun_dealloc(tun_if_name);
 #endif
-   }
 }
 
 /*

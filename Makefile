@@ -6,6 +6,9 @@ LIBS = -ljson
 map646: $(OBJS)
 	g++ $(CFLAGS) -o $@ $(OBJS) $(LIBS)
 
+stat_client:
+	g++ $(CFLAGS) -o ./contrib/stat/stat_client ./contrib/stat/stat_client.cpp $(LIBS)
+
 .c.o:
 	gcc -c $(CFLAGS) $<
 
@@ -14,3 +17,4 @@ map646: $(OBJS)
 
 clean:
 	rm -f *.o map646 *~
+	rm -f ./constrib/stat/stat_clilent

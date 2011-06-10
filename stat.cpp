@@ -186,7 +186,7 @@ namespace map646_stat{
                }
 
                /* Check the packet size. */
-               if (ip6_payload_len + sizeof(ip6_hdr) > len) {
+               if (ip6_payload_len + (ssize_t)sizeof(ip6_hdr) > len) {
                   /* Data is too short.  Drop it. */
                   warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
                         len, ip6_payload_len + sizeof(ip6_hdr));
@@ -244,7 +244,7 @@ namespace map646_stat{
                }
 
                /* Check the packet size. */
-               if (ip6_payload_len + sizeof(ip6_hdr) > len) {
+               if (ip6_payload_len + (ssize_t)sizeof(ip6_hdr) > len) {
                   /* Data is too short.  Drop it. */
                   warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
                         len, ip6_payload_len + sizeof(ip6_hdr));
@@ -306,7 +306,7 @@ namespace map646_stat{
                }
 
                /* Check the packet size. */
-               if (ip6_payload_len + sizeof(ip6_hdr) > len) {
+               if (ip6_payload_len + (ssize_t)sizeof(ip6_hdr) > len) {
                   /* Data is too short.  Drop it. */
                   warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
                         len, ip6_payload_len + sizeof(ip6_hdr));
@@ -391,9 +391,15 @@ namespace map646_stat{
       return 0;
 
    }
-   
+
+   void stat::flush(){
+      stat.clear();
+      stat66.clear();
+      std::cout << get_json() << std::endl;
+   }
+
    int stat::send(int fd){
-      std::string message = get_json();
+      std::string message(get_json());
       int size = message.size();
       write(fd, (uint8_t *)&size, sizeof(int));
       write(fd, message.c_str(), size);
@@ -517,46 +523,4 @@ namespace map646_stat{
          return std::string("unknown proto");
       }
    }
-
-   std::string stat::make_json_object(const char* key, const std::string &value){
-      std::stringstream ss;
-      ss << "\"" << key << "\":" << value;
-      return ss.str();
-   }
-  
-   std::string stat::make_json_object(const char* key, const uint64_t value){
-      std::stringstream ss;
-      ss << "\"" << key << "\":" << value;
-      return ss.str();
-   }
-   
-   std::string stat::len_output(const uint64_t *len){
-      std::stringstream ss;
-      ss << "[";
-      for(int i = 0; i < 11; i++){
-         if(i != 0)
-            ss << ",";
-         ss << len[i];
-      }
-      ss << "]";
-
-      return ss.str();
-   }
-
-   std::string stat::port_output(std::map<int,int64_t> &port_stat){
-      if(port_stat.empty())
-         return "null";
-      std::stringstream ss;
-      ss << "{";
-      std::map<int, int64_t>::iterator it = port_stat.begin();
-      while(it != port_stat.end()){
-         if(it != port_stat.begin())
-            ss << ",";
-         ss << "\"" << it->first << "\":" << it->second;
-         it++;
-      }
-      ss << "}";
-      return ss.str();
-   }
-
 }

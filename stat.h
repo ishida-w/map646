@@ -110,15 +110,11 @@ namespace map646_stat{
       public:
          int update(const uint8_t *bufp, ssize_t len, uint8_t d);
          int show();
-         std::string get_json();
+         void flush();
          int send(int fd);
-         int mem_show();
       private:
+         std::string get_json();
          int get_hist(int len);
-         std::string make_json_object(const char* key, const std::string &value);
-         std::string make_json_object(const char* key, const uint64_t value);
-         std::string port_output(std::map<int, int64_t> &port_stat);
-         std::string len_output(const uint64_t *len);
          std::string get_proto(int proto);
          std::map<map646_in_addr, stat_chunk> stat;
          std::map<map646_in6_addr, stat_chunk> stat66;
