@@ -217,6 +217,7 @@ int main(int argc, char *argv[])
             epevp->events = EPOLLIN;
             if(epoll_ctl(epfd, EPOLL_CTL_ADD, stat_fd, epevp) == -1)
                warnx("epoll_ctr failed()");
+            std::cout << "start handling stat_client fd: " << stat_fd << std::endl;
          }else{
             const int COMMAND_SIZE = 100;
             char command[COMMAND_SIZE];
@@ -224,52 +225,22 @@ int main(int argc, char *argv[])
                warnx("read() faild");
             }else{
                if(strcmp(command, "send") == 0){
-                  map_stat.show();
                   map_stat.send(stat_fd);
                }else if(strcmp(command, "flush") == 0){
-                  map_stat.show();
                   map_stat.flush();
-               }else if(strcmp(command, "quit") == 0){
-                  epoll_event epev;
-                  epev.data.fd = fd;
-                  if(epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &epev) == -1){
-                     perror("epoll_ctl() EPOLL_CTL_DEL failed");
-                  }
-                  close(fd);
                }else{
-                  warnx("unknown stat command");
+                  std::cout << "unknown command" << std::endl;
                }
+
+               epoll_event epev;
+               epev.data.fd = fd;
+               if(epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &epev) == -1){
+                  perror("epoll_ctl() EPOLL_CTL_DEL failed");
+               }
+               std::cout << "end handling stat_client fd: " << fd << std::endl;
+               close(fd);
             }
          }
-
-/*
- 
-            pid_t processID;
-
-            if((processID = fork()) < 0){
-               warnx("failed to fork");
-               continue;
-            }else if(processID == 0){
-               close(stat_listen_fd);
-               const int COMMAND_SIZE = 100;
-               char command[COMMAND_SIZE];
-               if(read(stat_fd, command, COMMAND_SIZE) < 0){
-                  warnx("read() failed");
-               }else{
-                  if(strcmp(command, "send") == 0){
-                     map_stat.show();
-                     map_stat.send(stat_fd);
-                  }else if(strcmp(command, "flush") == 0){
-                     map_stat.show();
-                     map_stat.flush();
-                  }else{
-                     warnx("unknown stat command");
-                  }
-               }
-               exit(0);
-            }
-*/
-
       }
    }
 

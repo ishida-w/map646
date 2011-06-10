@@ -26,38 +26,39 @@
 
 using namespace map646_stat;
 void cleanup_sigint(int);
+int fd;
 
 main()
 {
    sockaddr_un addr;
-   int fd;
    int len;
 
    if (signal(SIGINT, cleanup_sigint) == SIG_ERR) {
       err(EXIT_FAILURE, "failed to register a SIGINT hook.");
    }
-
    while(true){
 
-      if((fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
-         perror("socket");
-         exit(1);
-      }
-
-      memset((char *)&addr, 0, sizeof(addr));
-
-      addr.sun_family = AF_UNIX;
-      strcpy(addr.sun_path, STAT_SOCK); 
-
-      if(connect(fd, (sockaddr *)&addr, sizeof(addr.sun_family) + strlen(STAT_SOCK)) < 0){
-         perror("connect");
-         exit(1);
-      }
-      
       std::string command;
       std::cin >> command;
-     
+
       if(command == "send"){
+
+         if((fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
+            perror("socket");
+            exit(1);
+         }
+
+         memset((char *)&addr, 0, sizeof(addr));
+
+         addr.sun_family = AF_UNIX;
+         strcpy(addr.sun_path, STAT_SOCK); 
+
+         if(connect(fd, (sockaddr *)&addr, sizeof(addr.sun_family) + strlen(STAT_SOCK)) < 0){
+            perror("connect");
+            exit(1);
+         }
+
+         std::cout << "command: send" << std::endl;
          write(fd, "send", sizeof("send"));
          int n;
          read(fd, (void *)&n, sizeof(int));
@@ -66,10 +67,23 @@ main()
          json_object *jobj = json_tokener_parse(buf);
          std::cout << json_object_to_json_string(jobj) << std::endl;
       }else if(command == "flush"){
+
+         if((fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
+            perror("socket");
+            exit(1);
+         }
+         memset((char *)&addr, 0, sizeof(addr));
+         addr.sun_family = AF_UNIX;
+         strcpy(addr.sun_path, STAT_SOCK); 
+         if(connect(fd, (sockaddr *)&addr, sizeof(addr.sun_family) + strlen(STAT_SOCK)) < 0){
+            perror("connect");
+            exit(1);
+         }
+         std::cout << "command: flush" << std::endl;
          write(fd, "flush", sizeof("flush"));
       }else if(command == "quit"){
-         write(fd, "quit", sizeof("quit"));
          std::cout << "bye" <<std::endl;
+         close(fd);
          exit(0);
       }else{
          std::cout << "unknown command: commands are send | flush | quit" << std::endl;
@@ -77,6 +91,7 @@ main()
    }
 }
 
-void cleanup_sigint(int dummu){
+void cleanup_sigint(int dummy){
+   close(fd);
    exit(0);
 }
