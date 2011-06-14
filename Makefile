@@ -1,6 +1,6 @@
 OBJS	= map646.o mapping.o tunif.o checksum.o pmtudisc.o icmpsub.o stat.o
 
-CFLAGS	= -Wall -g
+CFLAGS	= -Wall #-g -DDEBUG
 LIBS = -ljson
 
 map646: $(OBJS)
@@ -17,4 +17,3 @@ stat_client:
 
 clean:
 	rm -f *.o map646 *~
-	rm -f ./constrib/stat/stat_clilent

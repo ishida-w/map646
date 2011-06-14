@@ -38,19 +38,22 @@ namespace map646_stat{
 #define UDP_IN   4
 #define UDP_OUT  5
 
-      struct stat_element_{
-         uint64_t num;      
-         uint64_t error;
-         uint64_t len[11];
-         std::map<int, int64_t> port_stat;
+      struct _stat_element{
+         int num;      
+         int error;
+         int len[11];
+         std::map<int, int> port_stat;
       }stat_element[6];
 
    };
 
    struct map646_in_addr{
       in_addr addr;
-      map646_in_addr(in_addr a){
+      map646_in_addr(const in_addr a){
          addr = a;
+      }
+      map646_in_addr(const char* a){
+         inet_pton(AF_INET, a, (uint8_t*)&addr);
       }
       bool operator==(const map646_in_addr &rhs)const{
          return addr.s_addr == rhs.addr.s_addr;
@@ -70,8 +73,11 @@ namespace map646_stat{
 
    struct map646_in6_addr{
       in6_addr addr;
-      map646_in6_addr(in6_addr a){
+      map646_in6_addr(const in6_addr a){
          addr = a;
+      }
+      map646_in6_addr(const char* a){
+         inet_pton(AF_INET6, a, (uint8_t*)&addr);
       }
       bool operator==(const map646_in6_addr &rhs)const{
          for(int i = 0; i < 4; i++){
@@ -115,8 +121,10 @@ namespace map646_stat{
       private:
          std::string get_json();
          int get_hist(int len);
-         std::string get_proto(int proto);
          std::map<map646_in_addr, stat_chunk> stat;
          std::map<map646_in6_addr, stat_chunk> stat66;
    };
+   
+   std::string get_proto(int proto);
+   int get_proto_ID(const char* proto);
 }

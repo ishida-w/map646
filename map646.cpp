@@ -143,12 +143,14 @@ int main(int argc, char *argv[])
    epevp->events = EPOLLIN;
    if(epoll_ctl(epfd, EPOLL_CTL_ADD, tun_fd, epevp) == -1)
       errx(EXIT_FAILURE, "epoll_ctl() failed");
+   delete epevp;
 
    epevp = new epoll_event;
    epevp->data.fd = stat_listen_fd;
    epevp->events = EPOLLIN;
    if(epoll_ctl(epfd, EPOLL_CTL_ADD, stat_listen_fd, epevp) == -1)
       errx(EXIT_FAILURE, "epoll_ctl() failed");
+   delete epevp;
    
    /* Create mapping table from the configuraion file. */
    if (mapping_create_table(map646_conf_path.c_str(), 0) == -1) {
@@ -212,12 +214,11 @@ int main(int argc, char *argv[])
                continue;
             }
 
-            epevp = new epoll_event;
-            epevp->data.fd = stat_fd;
-            epevp->events = EPOLLIN;
-            if(epoll_ctl(epfd, EPOLL_CTL_ADD, stat_fd, epevp) == -1)
+            epoll_event epev;
+            epev.data.fd = stat_fd;
+            epev.events = EPOLLIN;
+            if(epoll_ctl(epfd, EPOLL_CTL_ADD, stat_fd, &epev) == -1)
                warnx("epoll_ctr failed()");
-            std::cout << "start handling stat_client fd: " << stat_fd << std::endl;
          }else{
             const int COMMAND_SIZE = 100;
             char command[COMMAND_SIZE];
@@ -237,7 +238,6 @@ int main(int argc, char *argv[])
                if(epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &epev) == -1){
                   perror("epoll_ctl() EPOLL_CTL_DEL failed");
                }
-               std::cout << "end handling stat_client fd: " << fd << std::endl;
                close(fd);
             }
          }

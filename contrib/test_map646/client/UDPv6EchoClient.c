@@ -39,10 +39,12 @@ int test_udp6(char *servIP, char *echoString, unsigned short echoServPort)
    echoServAddr.sin6_addr = server;
    echoServAddr.sin6_port = htons(echoServPort);
 
+   echoStringLen = strlen(echoString);
+
    if(sendto(sock, echoString, echoStringLen, 0, (struct sockaddr *)
             &echoServAddr, sizeof(echoServAddr)) != echoStringLen)
       DieWithError("sendto() sent a different number of bytes than expected");
-
+   
    fromSize = sizeof(fromAddr);
    FD_ZERO(&readfds);
    FD_SET(sock, &readfds);
@@ -62,10 +64,11 @@ int test_udp6(char *servIP, char *echoString, unsigned short echoServPort)
       }
 
       if(FD_ISSET(sock, &fds)){
+         if(recv(sock, echoBuffer, ECHOMAX - 1, 0) < 0)
+            DieWithError("recv() failed or connection closed");
          if((respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
                      (struct sockaddr *) &fromAddr, &fromSize)) != echoStringLen)
             DieWithError("recvfrom() failed");
-
 
          int check = 0, i;
          for(i = 0; i < 16; i++){
@@ -76,7 +79,7 @@ int test_udp6(char *servIP, char *echoString, unsigned short echoServPort)
          if(check)
          {
             fprintf(stderr, "Error: received a packet from unknown source.\n");
-            return 1;
+            //return 1;
          }
          
          echoBuffer[respStringLen] = '\0';

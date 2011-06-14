@@ -65,7 +65,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
-
+#include <map>
 #include <json/json.h>
 
 #include "mapping.h"
@@ -346,12 +346,12 @@ namespace map646_stat{
             std::cout << "  " << get_proto(i) << ": " << std::endl;
             std::cout << "   num = " << it->second.stat_element[i].num << std::endl;
             for(int j = 0; j < 11; j++){
-               uint64_t len =  it->second.stat_element[i].len[j];
+               int len =  it->second.stat_element[i].len[j];
                if(len != 0)
                   std::cout << "   len[" << j << "] = " << len << std::endl;
             }
             if(!it->second.stat_element[i].port_stat.empty()){
-               std::map<int, int64_t>::iterator port_it = it->second.stat_element[i].port_stat.begin();
+               std::map<int, int>::iterator port_it = it->second.stat_element[i].port_stat.begin();
                while(port_it != it->second.stat_element[i].port_stat.end()){
                   std::cout << "    " << port_it->first << " = " << port_it->second << std::endl;
                   port_it++;
@@ -371,12 +371,12 @@ namespace map646_stat{
             std::cout << "  " << get_proto(i) << ": " << std::endl;
             std::cout << "   num = " << it6->second.stat_element[i].num << std::endl;
             for(int j = 0; j < 11; j++){
-               uint64_t len =  it6->second.stat_element[i].len[j];
+               int len =  it6->second.stat_element[i].len[j];
                if(len != 0)
                   std::cout << "   len[" << j << "] = " << len << std::endl;
             }
             if(!it6->second.stat_element[i].port_stat.empty()){
-               std::map<int, int64_t>::iterator port_it = it6->second.stat_element[i].port_stat.begin();
+               std::map<int, int>::iterator port_it = it6->second.stat_element[i].port_stat.begin();
                std::cout << "   port: " << std::endl;
                while(port_it != it6->second.stat_element[i].port_stat.end()){
                   std::cout << "    " << port_it->first << " = " << port_it->second << std::endl;
@@ -395,7 +395,6 @@ namespace map646_stat{
    void stat::flush(){
       stat.clear();
       stat66.clear();
-      std::cout << get_json() << std::endl;
    }
 
    int stat::send(int fd){
@@ -433,7 +432,7 @@ namespace map646_stat{
                if(it->second.stat_element[i].port_stat.empty()){
                   json_object_object_add(element, "port", NULL);
                }else{
-                  std::map<int, int64_t>::iterator port_it = it->second.stat_element[i].port_stat.begin();
+                  std::map<int, int>::iterator port_it = it->second.stat_element[i].port_stat.begin();
                   json_object *port = json_object_new_object();
                   while(port_it != it->second.stat_element[i].port_stat.end()){
                      std::stringstream ss;
@@ -476,7 +475,7 @@ namespace map646_stat{
                if(it6->second.stat_element[i].port_stat.empty()){
                   json_object_object_add(element, "port", NULL);
                }else{
-                  std::map<int, int64_t>::iterator port_it = it6->second.stat_element[i].port_stat.begin();
+                  std::map<int, int>::iterator port_it = it6->second.stat_element[i].port_stat.begin();
                   json_object *port = json_object_new_object();
                   while(port_it != it6->second.stat_element[i].port_stat.end()){
                      std::stringstream ss;
@@ -506,21 +505,39 @@ namespace map646_stat{
       return ret;
    }
 
-   std::string stat::get_proto(int proto){
-      if(proto == 0){
+   std::string get_proto(int proto){
+      if(proto == ICMP_IN){
          return std::string("icmp_in");
-      }else if(proto == 1){
+      }else if(proto == ICMP_OUT){
          return std::string("icmp_out");
-      }else if(proto == 2){
+      }else if(proto == TCP_IN){
          return std::string("tcp_in");
-      }else if(proto == 3){
+      }else if(proto == TCP_OUT){
          return std::string("tcp_out");
-      }else if(proto == 4){
+      }else if(proto == UDP_IN){
          return std::string("udp_in");
-      }else if(proto == 5){
+      }else if(proto == UDP_OUT){
          return std::string("udp_out");
       }else{
          return std::string("unknown proto");
+      }
+   }
+
+   int get_proto_ID(const char* proto){
+      if(!strcmp(proto, "icmp_in")){
+         return ICMP_IN;
+      }else if(!strcmp(proto, "icmp_out")){
+         return ICMP_OUT;
+      }else if(!strcmp(proto, "tcp_in")){
+         return TCP_IN;
+      }else if(!strcmp(proto, "tcp_out")){
+         return TCP_OUT;
+      }else if(!strcmp(proto, "udp_in")){
+         return UDP_IN;
+      }else if(!strcmp(proto, "udp_out")){
+         return UDP_OUT;
+      }else{
+         return -1;
       }
    }
 }

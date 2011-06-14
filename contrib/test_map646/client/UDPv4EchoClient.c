@@ -37,10 +37,11 @@ int test_udp4(char *servIP, char *echoString, unsigned short echoServPort)
    echoServAddr.sin_addr.s_addr = inet_addr(servIP);
    echoServAddr.sin_port = htons(echoServPort);
 
+   echoStringLen = strlen(echoString);
+
    if(sendto(sock, echoString, echoStringLen, 0, (struct sockaddr *)
             &echoServAddr, sizeof(echoServAddr)) != echoStringLen)
       DieWithError("sendto() sent a different number of bytes than expected");
-
    fromSize = sizeof(fromAddr);
    FD_ZERO(&readfds);
    FD_SET(sock, &readfds);
