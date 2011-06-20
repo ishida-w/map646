@@ -419,36 +419,41 @@ namespace map646_stat{
             json_object *chunk = json_object_new_object();
             for(int i = 0; i < 6; i++){
                json_object *element = json_object_new_object();
-               
-               json_object *num = json_object_new_int(it->second.stat_element[i].num);
-               json_object_object_add(element, "num", num);
-
-               json_object *len = json_object_new_array();
-               for(int j = 0; j < 11; j++){
-                  json_object_array_add(len, json_object_new_int(it->second.stat_element[i].len[j]));
-               }
-               json_object_object_add(element, "len", len);
-
-               if(it->second.stat_element[i].port_stat.empty()){
-                  json_object_object_add(element, "port", NULL);
+              
+               int num = it->second.stat_element[i].num;
+               if(num == 0){
+                  json_object_object_add(chunk, get_proto(i).c_str(), NULL);
                }else{
-                  std::map<int, int>::iterator port_it = it->second.stat_element[i].port_stat.begin();
-                  json_object *port = json_object_new_object();
-                  while(port_it != it->second.stat_element[i].port_stat.end()){
-                     std::stringstream ss;
-                     ss << port_it->first;
-                     std::string s = ss.str();
-                     json_object_object_add(port,s.c_str(), json_object_new_int(port_it->second));
-                     port_it++;
+                  json_object *jnum = json_object_new_int(num);
+                  json_object_object_add(element, "num", jnum);
+
+                  json_object *len = json_object_new_array();
+                  for(int j = 0; j < 11; j++){
+                     json_object_array_add(len, json_object_new_int(it->second.stat_element[i].len[j]));
                   }
-                  json_object_object_add(element, "port", port);
+                  json_object_object_add(element, "len", len);
+
+                  if(it->second.stat_element[i].port_stat.empty()){
+                     json_object_object_add(element, "port", NULL);
+                  }else{
+                     std::map<int, int>::iterator port_it = it->second.stat_element[i].port_stat.begin();
+                     json_object *port = json_object_new_object();
+                     while(port_it != it->second.stat_element[i].port_stat.end()){
+                        std::stringstream ss;
+                        ss << port_it->first;
+                        std::string s = ss.str();
+                        json_object_object_add(port,s.c_str(), json_object_new_int(port_it->second));
+                        port_it++;
+                     }
+                     json_object_object_add(element, "port", port);
+                  }
+                  json_object_object_add(chunk, get_proto(i).c_str(), element); 
                }
-               json_object_object_add(chunk, get_proto(i).c_str(), element); 
             }
             json_object_object_add(v4, (it->first.get_addr()).c_str(), chunk);
             it++;
          }
-         
+
          json_object_object_add(jobj, "v4", v4);
       }
 
@@ -464,34 +469,39 @@ namespace map646_stat{
                json_object *element = json_object_new_object();
                
                json_object *num = json_object_new_int(it6->second.stat_element[i].num);
-               json_object_object_add(element, "num", num);
 
-               json_object *len = json_object_new_array();
-               for(int j = 0; j < 11; j++){
-                  json_object_array_add(len, json_object_new_int(it6->second.stat_element[i].len[j]));
-               }
-               json_object_object_add(element, "len", len);
-
-               if(it6->second.stat_element[i].port_stat.empty()){
-                  json_object_object_add(element, "port", NULL);
+               if(num == 0){
+                  json_object_object_add(chunk, get_proto(i).c_str(), NULL);
                }else{
-                  std::map<int, int>::iterator port_it = it6->second.stat_element[i].port_stat.begin();
-                  json_object *port = json_object_new_object();
-                  while(port_it != it6->second.stat_element[i].port_stat.end()){
-                     std::stringstream ss;
-                     ss << port_it->first;
-                     std::string s = ss.str();
-                     json_object_object_add(port,s.c_str(), json_object_new_int(port_it->second));
-                     port_it++;
+                  json_object_object_add(element, "num", num);
+
+                  json_object *len = json_object_new_array();
+                  for(int j = 0; j < 11; j++){
+                     json_object_array_add(len, json_object_new_int(it6->second.stat_element[i].len[j]));
                   }
-                  json_object_object_add(element, "port", port);
+                  json_object_object_add(element, "len", len);
+
+                  if(it6->second.stat_element[i].port_stat.empty()){
+                     json_object_object_add(element, "port", NULL);
+                  }else{
+                     std::map<int, int>::iterator port_it = it6->second.stat_element[i].port_stat.begin();
+                     json_object *port = json_object_new_object();
+                     while(port_it != it6->second.stat_element[i].port_stat.end()){
+                        std::stringstream ss;
+                        ss << port_it->first;
+                        std::string s = ss.str();
+                        json_object_object_add(port,s.c_str(), json_object_new_int(port_it->second));
+                        port_it++;
+                     }
+                     json_object_object_add(element, "port", port);
+                  }
+                  json_object_object_add(chunk, get_proto(i).c_str(), element); 
                }
-               json_object_object_add(chunk, get_proto(i).c_str(), element); 
             }
             json_object_object_add(v6, (it6->first.get_addr()).c_str(), chunk);
             it6++;
          }
-         
+
          json_object_object_add(jobj, "v6", v6);
       }
 

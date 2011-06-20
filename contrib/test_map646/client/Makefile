@@ -1,13 +1,11 @@
-OBJS = map646_test_client.o TCPv4EchoClient.o TCPv6EchoClient.o UDPv4EchoClient.o UDPv6EchoClient.o DieWithError.o
+OBJS = client.o
 
-CFLAGS = -Wall -g -DDEBUG
+client: $(OBJS)
+	g++ $(OBJS) -o $@
+	scp client wataru@192.168.1.194:~/
 
-.c.o:
-	gcc -c $(CFLAGS) $<
-
-map646_test_client: $(OBJS)
-	gcc $(CFLAGS) -o map646_test_client $(OBJS)
+.cpp.o:
+	g++ -c $<
 
 clean:
-	rm -f *.o map646_test_server *~
-
+	rm -f *.o client *~

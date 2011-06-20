@@ -1,14 +1,12 @@
-OBJS =  TCPEchoServer-Fork.o AcceptTCPConnection.o  CreateUDPServerSock.o  HandleTCPClient.o CreateTCPServerSock.o \
-DieWithError.o HandleUDPClient.o 
+OBJS = server.o
 
-CFLAGS = -Wall -g -DDEBUG
+server: $(OBJS) 
+	g++ $(OBJS) -o $@
+	scp server wataru@192.168.1.191:~/
 
-.c.o:
-	gcc -c $(CFLAGS) $<
-
-map646_test_server: $(OBJS)
-	gcc $(CFLAGS) -o map646_test_server $(OBJS)
+.cpp.o:
+	g++ -c $<
 
 clean:
-	rm -f *.o map646_test_server *~
+	rm -f *.o server *~
 
