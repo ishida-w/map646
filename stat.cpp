@@ -345,6 +345,7 @@ namespace map646_stat{
          for(int i = 0; i < 6; i++){
             std::cout << "  " << get_proto(i) << ": " << std::endl;
             std::cout << "   num = " << it->second.stat_element[i].num << std::endl;
+
             for(int j = 0; j < 11; j++){
                int len =  it->second.stat_element[i].len[j];
                if(len != 0)
@@ -424,15 +425,29 @@ namespace map646_stat{
                if(num == 0){
                   json_object_object_add(chunk, get_proto(i).c_str(), NULL);
                }else{
+                  /* add num stat */
                   json_object *jnum = json_object_new_int(num);
                   json_object_object_add(element, "num", jnum);
 
-                  json_object *len = json_object_new_array();
-                  for(int j = 0; j < 11; j++){
-                     json_object_array_add(len, json_object_new_int(it->second.stat_element[i].len[j]));
+                  /* add len stat */
+                  
+                  if(it->second.stat_element[i].len.empty()){
+                     json_object_object_add(element, "len", NULL);
+                  }else{
+                     std::map<int, int>::iterator len_it = it->second.stat_element[i].len.begin();
+                     json_object *len = json_object_new_object();
+                     while(len_it != it->second.stat_element[i].len.end()){
+                        std::stringstream ss;
+                        ss << len_it->first;
+                        std::string s = ss.str();
+                        json_object_object_add(len,s.c_str(), json_object_new_int(len_it->second));
+                        len_it++;
+                     }
+                     json_object_object_add(element, "len", len);
                   }
-                  json_object_object_add(element, "len", len);
 
+
+                  /* add port stat */
                   if(it->second.stat_element[i].port_stat.empty()){
                      json_object_object_add(element, "port", NULL);
                   }else{
@@ -447,6 +462,8 @@ namespace map646_stat{
                      }
                      json_object_object_add(element, "port", port);
                   }
+
+                  /* add three stats above to chunk */
                   json_object_object_add(chunk, get_proto(i).c_str(), element); 
                }
             }
@@ -468,19 +485,33 @@ namespace map646_stat{
             for(int i = 0; i < 6; i++){
                json_object *element = json_object_new_object();
                
-               json_object *num = json_object_new_int(it6->second.stat_element[i].num);
+               int num = it6->second.stat_element[i].num;
 
                if(num == 0){
                   json_object_object_add(chunk, get_proto(i).c_str(), NULL);
                }else{
-                  json_object_object_add(element, "num", num);
+                  /* add num stat */
+                  json_object *jnum = json_object_new_int(num);
+                  json_object_object_add(element, "num", jnum);
 
-                  json_object *len = json_object_new_array();
-                  for(int j = 0; j < 11; j++){
-                     json_object_array_add(len, json_object_new_int(it6->second.stat_element[i].len[j]));
+                  /* add len stat */
+                  if(it6->second.stat_element[i].len.empty()){
+                     json_object_object_add(element, "len", NULL);
+                  }else{
+                     std::map<int, int>::iterator len_it = it6->second.stat_element[i].len.begin();
+                     json_object *len = json_object_new_object();
+                     while(len_it != it6->second.stat_element[i].len.end()){
+                        std::stringstream ss;
+                        ss << len_it->first;
+                        std::string s = ss.str();
+                        json_object_object_add(len,s.c_str(), json_object_new_int(len_it->second));
+                        len_it++;
+                     }
+                     json_object_object_add(element, "len", len);
                   }
-                  json_object_object_add(element, "len", len);
 
+
+                  /* add port stat */
                   if(it6->second.stat_element[i].port_stat.empty()){
                      json_object_object_add(element, "port", NULL);
                   }else{
@@ -495,6 +526,8 @@ namespace map646_stat{
                      }
                      json_object_object_add(element, "port", port);
                   }
+
+                  /* add three stat above to chunk */
                   json_object_object_add(chunk, get_proto(i).c_str(), element); 
                }
             }

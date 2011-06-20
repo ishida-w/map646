@@ -41,7 +41,8 @@ namespace map646_stat{
       struct _stat_element{
          int num;      
          int error;
-         int len[11];
+         //int len[11];
+         std::map<int, int> len;
          std::map<int, int> port_stat;
       }stat_element[6];
 
