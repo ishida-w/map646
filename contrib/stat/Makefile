@@ -5,12 +5,12 @@ CFLAGS = -Wall -g -DDEBUG
 LIBS = -ljson
 
 
+stat_client_cron: $(OBJS)
+	g++ $(CFLAGS) -o $@ $(OBJS) $(LIBS)
 
 stat_client: $(OBJS2)
 	g++ $(CFLAGS) -o $@ $(OBJS2) $(LIBS)
 
-stat_client_cron: $(OBJS)
-	g++ $(CFLAGS) -o $@ $(OBJS) $(LIBS)
 .cpp.o:
 	g++ -c $(CFLAGS) $<
 

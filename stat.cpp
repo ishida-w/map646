@@ -47,11 +47,13 @@
 #include <linux/if_tun.h>
 #include <linux/if_ether.h>
 #include <arpa/inet.h>
+
 #else
 #include <ifaddrs.h>
 #include <net/route.h>
 #include <net/if_dl.h>
 #include <net/if_tun.h>
+#include <netinet/in.h>
 #endif
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -394,8 +396,10 @@ namespace map646_stat{
    }
 
    void stat::flush(){
-      stat.clear();
-      stat66.clear();
+      std::map<map646_in6_addr, stat_chunk> swap66;
+      std::map<map646_in_addr, stat_chunk> swap;
+      stat66.swap(swap66);
+      stat.swap(swap);
    }
 
    int stat::send(int fd){

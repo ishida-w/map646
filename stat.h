@@ -122,8 +122,8 @@ namespace map646_stat{
       private:
          std::string get_json();
          int get_hist(int len);
-         std::map<map646_in_addr, stat_chunk> stat;
          std::map<map646_in6_addr, stat_chunk> stat66;
+         std::map<map646_in_addr, stat_chunk> stat;
    };
    
    std::string get_proto(int proto);

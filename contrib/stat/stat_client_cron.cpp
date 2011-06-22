@@ -54,13 +54,13 @@ int main(int argc, char** argv)
       if(!strcmp("-t", argv[i])){
          if( i + 1 < argc){
             std::string s_time(argv[i+1]);
-            if(s_time.length() != 10){
+            if(s_time.length() != 12){
                std::cout << "invalid time: " << argv[i+1] << std::endl;
                exit(1);
             }
 
             std::stringstream ss;
-            int year, month, day, hour;
+            int year, month, day, hour, min;
             ss << s_time.substr(0, 4) << std::endl;
             ss >> year;
             ss.str("");
@@ -73,11 +73,15 @@ int main(int argc, char** argv)
             ss << s_time.substr(8, 2) << std::endl;
             ss >> hour;
             ss.str("");
+            ss << s_time.substr(10, 2) << std::endl;
+            ss >> min;
+            ss.str("");
 
             time.tm_year = year - 1900;
             time.tm_mon = month - 1;
             time.tm_mday = day;
             time.tm_hour = hour;
+            time.tm_min = min;
 
          }else{
             std::cout << "usage: -f filename [-t] time" << std::endl;
@@ -149,7 +153,7 @@ int main(int argc, char** argv)
       stat += buf;
    }
 
-   json_object *jobj, *jyear, *jmonth, *jday, *jhour;
+   json_object *jobj, *jyear, *jmonth, *jday, *jhour, *jmin;
 
    if(stat.empty()){
 
@@ -157,8 +161,10 @@ int main(int argc, char** argv)
       jyear = json_object_new_object();
       jmonth = json_object_new_object();
       jday = json_object_new_object();
+      jhour = json_object_new_object();
 
-      json_object_object_add(jday, ctime.s_hour().c_str(), new_jobj);
+      json_object_object_add(jhour, ctime.s_min().c_str(), new_jobj);
+      json_object_object_add(jday, ctime.s_hour().c_str(), jhour);
       json_object_object_add(jmonth, ctime.s_day().c_str(), jday);
       json_object_object_add(jyear, ctime.s_month().c_str(), jmonth);
       json_object_object_add(jobj, ctime.s_year().c_str(), jyear);
@@ -172,7 +178,7 @@ int main(int argc, char** argv)
          return 0;
       }
       
-      std::stringstream slastyear, slastmonth, slastday, slasthour;
+      std::stringstream slastyear, slastmonth, slastday, slasthour, slastmin;
       {
          int year = 0, temp;
          json_object_object_foreach(jobj, key, value){
@@ -222,42 +228,71 @@ int main(int argc, char** argv)
                hour = temp;
          }
          slasthour << hour;
+
+         jhour = json_object_object_get(jday, slasthour.str().c_str());
+      }
+      {
+         int min = 0, temp;
+         json_object_object_foreach(jhour, key, value){
+            std::stringstream ss;
+            ss << key;
+            ss >> temp;
+            if(temp > min)
+               min = temp;
+         }
+         slastmin << min;
       }
 
-      std::cout << "last update: " << slastyear.str() << "," <<  slastmonth.str() << "," << slastday.str() << "," << slasthour.str() << std::endl;
+      std::cout << "last update: " << slastyear.str() << "," <<  slastmonth.str() << "," << slastday.str() << "," << slasthour.str() << "," << slastmin.str() << std::endl;
 
       if(ctime.s_year() == slastyear.str()){
          if(ctime.s_month() == slastmonth.str()){
             if(ctime.s_day() == slastday.str()){
                if(ctime.s_hour() == slasthour.str()){
-                  std::cout << "entry already exists" << std::endl;
-                  exit(1);
+                  if(ctime.s_min() == slastmin.str()){
+                     std::cout << "entry already exists" << std::endl;
+                     exit(1);
+                  }else{
+                     json_object_object_add(jhour, ctime.s_min().c_str(), new_jobj);
+                  }
                }else{
-                  json_object_object_add(jday, ctime.s_hour().c_str(), new_jobj);
+                  merge(jhour);
+                  jhour = json_object_new_object();
+                  json_object_object_add(jhour, ctime.s_min().c_str(), new_jobj);
+                  json_object_object_add(jday, ctime.s_hour().c_str(), jhour);
                }
             }else{
+               merge(jhour);
                merge(jday);
+               jhour = json_object_new_object();
                jday = json_object_new_object();
-               json_object_object_add(jday, ctime.s_hour().c_str(), new_jobj);
+               json_object_object_add(jhour, ctime.s_min().c_str(), new_jobj);
+               json_object_object_add(jday, ctime.s_hour().c_str(), jhour);
                json_object_object_add(jmonth, ctime.s_day().c_str(), jday);
             }
          }else{
+            merge(jhour);
             merge(jday);
             merge(jmonth);
-            jmonth = json_object_new_object();
+            jhour = json_object_new_object();
             jday = json_object_new_object();
-            json_object_object_add(jday, ctime.s_hour().c_str(), new_jobj);
+            jmonth = json_object_new_object();
+            json_object_object_add(jhour, ctime.s_min().c_str(), new_jobj);
+            json_object_object_add(jday, ctime.s_hour().c_str(), jhour);
             json_object_object_add(jmonth, ctime.s_day().c_str(), jday);
             json_object_object_add(jyear, ctime.s_month().c_str(), jmonth);
          }
       }else{
+         merge(jhour);
          merge(jday);
          merge(jmonth);
          merge(jyear);
-         jyear = json_object_new_object();
-         jmonth = json_object_new_object();
+         jhour = json_object_new_object();
          jday = json_object_new_object();
-         json_object_object_add(jday, ctime.s_hour().c_str(), new_jobj);
+         jmonth = json_object_new_object();
+         jyear = json_object_new_object();
+         json_object_object_add(jhour, ctime.s_hour().c_str(), new_jobj);
+         json_object_object_add(jday, ctime.s_hour().c_str(), jhour);
          json_object_object_add(jmonth, ctime.s_day().c_str(), jday);
          json_object_object_add(jyear, ctime.s_month().c_str(), jmonth);
          json_object_object_add(jobj, ctime.s_year().c_str(), jyear);
