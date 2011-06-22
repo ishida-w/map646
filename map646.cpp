@@ -41,6 +41,8 @@
 #include <sys/epoll.h>
 #include <net/if.h>
 
+#include <sys/time.h>
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -169,6 +171,11 @@ int main(int argc, char *argv[])
    ssize_t read_len;
    uint8_t buf[BUF_LEN];
    uint8_t *bufp;
+   
+
+   bool stat_enable = true;
+   uint64_t true_time = 0, false_time = 0;
+   uint64_t true_time_index = 0, false_time_index = 0;
 
    /* MAIN WHILE LOOP */ 
    while(1)
@@ -188,8 +195,14 @@ int main(int argc, char *argv[])
             int d = dispatch(bufp);
             bufp += sizeof(uint32_t);
 
-            if(map_stat.update(bufp, read_len, d) < 0){
-               warnx("failed to update stat");
+            timeval tv1, tv2;
+
+//            gettimeofday(&tv1, NULL);
+
+            if(stat_enable == true){
+               if(map_stat.update(bufp, read_len, d) < 0){
+                  warnx("failed to update stat");
+               }
             }
 
             switch (d) {
@@ -208,6 +221,32 @@ int main(int argc, char *argv[])
                default:
                   warnx("unsupported mapping");
             }
+
+//            gettimeofday(&tv2, NULL);
+/*
+            timeval time;
+            time.tv_sec = tv2.tv_sec - tv1.tv_sec;
+            time.tv_usec = tv2.tv_usec - tv1.tv_usec;
+
+            //std::cout << std::boolalpha << "time: " << time.tv_sec << "." << time.tv_usec << ", stat_enable: " << stat_enable << std::endl;
+            
+            if(stat_enable){
+               if(true_time_index == 1000){
+                  std::cout << "enable time: " << true_time  << ", " << true_time_index << "[usec]" << std::endl;
+               }
+               //std::cout << "true_time: " << true_time << std::endl;
+               true_time += time.tv_usec;
+               true_time_index++;
+            }else{
+               if(false_time_index == 1000){
+                  std::cout << "unable time: " << false_time << ", " << false_time_index << "[usec]" << std::endl;
+               }
+               //std::cout << "false_time: "<< false_time << std::endl;
+               false_time += time.tv_usec;
+               false_time_index++;
+            }
+*/
+
          }else if(fd == stat_listen_fd){
             if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
                warnx("failed to accept stat client");
@@ -229,6 +268,16 @@ int main(int argc, char *argv[])
                   map_stat.send(stat_fd);
                }else if(strcmp(command, "flush") == 0){
                   map_stat.flush();
+                  true_time = false_time = 0;
+                  true_time_index = false_time_index = 0;
+               }else if(strcmp(command, "toggle") == 0){
+                  if(stat_enable == true)
+                     stat_enable = false;
+                  else
+                     stat_enable = true;
+               }else if(strcmp(command, "time") == 0){
+                  //std::cout << "stat_enabled: " << true_time/(double)true_time_index << "[usec]" << std::endl;
+                  //std::cout << "stat_unabled: " << false_time/(double)false_time_index << "[usec]" << std::endl;
                }else{
                   std::cout << "unknown command" << std::endl;
                }

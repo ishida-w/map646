@@ -28,10 +28,9 @@ using namespace map646_stat;
 void cleanup_sigint(int);
 int fd;
 
-main()
+int main()
 {
    sockaddr_un addr;
-   int len;
 
    if (signal(SIGINT, cleanup_sigint) == SIG_ERR) {
       err(EXIT_FAILURE, "failed to register a SIGINT hook.");
@@ -85,10 +84,42 @@ main()
          std::cout << "bye" <<std::endl;
          close(fd);
          exit(0);
+      }else if(command == "toggle"){
+         if((fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
+            perror("socket");
+            exit(1);
+         }
+         memset((char *)&addr, 0, sizeof(addr));
+         addr.sun_family = AF_UNIX;
+         strcpy(addr.sun_path, STAT_SOCK);
+         if(connect(fd, (sockaddr *)&addr, sizeof(addr.sun_family) + strlen(STAT_SOCK)) < 0){
+            perror("connect");
+            exit(1);
+         }
+         std::cout << "command: toggle" << std::endl;
+         write(fd, "toggle", sizeof("toggle"));
+
+      }else if(command == "time"){
+         if((fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
+            perror("socket");
+            exit(1);
+         }
+         memset((char *)&addr, 0, sizeof(addr));
+         addr.sun_family = AF_UNIX;
+         strcpy(addr.sun_path, STAT_SOCK);
+         if(connect(fd, (sockaddr *)&addr, sizeof(addr.sun_family) + strlen(STAT_SOCK)) < 0){
+            perror("connect");
+            exit(1);
+         }
+         std::cout << "command: time" << std::endl;
+         write(fd, "time", sizeof("time"));
+
       }else{
-         std::cout << "unknown command: commands are send | flush | quit" << std::endl;
+         std::cout << "unknown command: commands are send | flush | quit | toggle" << std::endl;
       }
    }
+
+   return 0;
 }
 
 void cleanup_sigint(int dummy){
