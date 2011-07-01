@@ -1,9 +1,9 @@
 MAP646 = /home/wataru/map646
 
-OBJS = stat_client_cron.o $(MAP646)/stat.o $(MAP646)/mapping.o $(MAP646)/tunif.o
+OBJS = stat_client_cron.o stat_file.o stat_file_manager.o date.o json_util.o $(MAP646)/stat.o $(MAP646)/mapping.o $(MAP646)/tunif.o
 CFLAGS = -Wall -g -DDEBUG
 LIBS = -ljson
-INC = -I$(MAP646)/include
+INC = -I$(MAP646)
 
 stat_client_cron: $(OBJS)
 	g++ $(CFLAGS) -o $@ $(OBJS) $(LIBS) $(INC)
