@@ -11,7 +11,6 @@
 #include <signal.h>
 #include <err.h>
 
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -129,7 +128,7 @@ int main(int argc, char** argv)
   stat_file_manager fm(dirname);
  
   if(!fm.empty()){
-//    fm.merge(ctime); 
+    fm.merge(ctime); 
   }
   
 //  fm.add(ctime, new_jobj);

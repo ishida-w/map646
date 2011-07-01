@@ -1,7 +1,7 @@
 #ifndef STAT_FILE_MANAGER_H
 #define STAT_FILE_MANAGER_H
 
-#include <iostream>
+
 #include <string>
 #include <vector>
 
@@ -9,11 +9,12 @@
 
 class stat_file_manager{
    private:
-      std::vector<stat_file> stat_files;
       std::string dirname;
+      std::vector<stat_file> stat_files;
+      int merge(date time);
    public:
       stat_file_manager(std::string dirname0);
-      int merge(date ctime);
+      int update(date ctime);
       date get_lastupdate_date();
       bool empty();
 };

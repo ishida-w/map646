@@ -70,7 +70,7 @@ void date::set_time(std::string ts0){
 
 }
 
-tm date::get_time(){
+tm& date::get_time(){
    return ts;
 }
 

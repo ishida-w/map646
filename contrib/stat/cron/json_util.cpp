@@ -21,7 +21,7 @@
 
 #include "stat.h"
 
-int merge(json_object* jobj){
+int json_merge(json_object* jobj){
    if(jobj == NULL){
       warnx("merge() arg is NULL");
       return -1;

@@ -12,7 +12,7 @@ public:
    void set_time(tm ts0);
    void set_time(std::string ts0);
         
-   tm get_time();
+   tm& get_time();
    std::string get_stime();
    
    int year();
