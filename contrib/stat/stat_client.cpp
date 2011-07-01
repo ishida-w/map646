@@ -20,7 +20,7 @@
 
 #include <json/json.h>
 
-#include "../../stat.h"
+#include "stat.h"
 
 #define STAT_SOCK "/tmp/map646_stat"
 

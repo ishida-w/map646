@@ -195,8 +195,7 @@ int main(int argc, char *argv[])
             int d = dispatch(bufp);
             bufp += sizeof(uint32_t);
 
-            timeval tv1, tv2;
-
+//            timeval tv1, tv2;
 //            gettimeofday(&tv1, NULL);
 
             if(stat_enable == true){

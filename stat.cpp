@@ -396,10 +396,8 @@ namespace map646_stat{
    }
 
    void stat::flush(){
-      std::map<map646_in6_addr, stat_chunk> swap66;
-      std::map<map646_in_addr, stat_chunk> swap;
-      stat66.swap(swap66);
-      stat.swap(swap);
+      std::map<map646_in6_addr, stat_chunk>().swap(stat66);
+      std::map<map646_in_addr, stat_chunk>().swap(stat);
    }
 
    int stat::send(int fd){

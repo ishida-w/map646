@@ -1,4 +1,6 @@
 #include <iostream>
+#include <iterator>
+#include <algorithm>
 #include <fstream>
 #include <string>
 #include <map>
@@ -8,6 +10,8 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <err.h>
+
+#include <dirent.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -22,83 +26,62 @@
 #include <netinet/icmp6.h>
 
 #include <json/json.h>
-#include "date.h"
-#include "../../stat.h"
-
+#include "stat.h"
+#include "stat_file.h"
 #define STAT_SOCK "/tmp/map646_stat"
 
 void cleanup_sigint(int);
 int merge(json_object* jobj);
+tm find_last_update(json_object* jobj, json_object* jyear, json_object* jmonth, json_object* jday, json_object* jhour);
+
 int fd;
 
 int main(int argc, char** argv)
 {
-   if(!(argc == 3 || argc == 5)){
-      std::cout << "usage: -f filename [-t] time" << std::endl;
-      exit(1);
-   }
-
-   std::string filename;
-   time_t timer = time(NULL);
-   tm time = *(localtime(&timer));
-
-   for(int i = 0; i < argc; i++){
-      if(!strcmp("-f",argv[i])){
-         if(i + 1 < argc){
-            filename = argv[i+1];
-         }else{
-            std::cout << "usage: -f filename [-t] time" << std::endl;
-            exit(1);
-         }
-      }
-      if(!strcmp("-t", argv[i])){
-         if( i + 1 < argc){
-            std::string s_time(argv[i+1]);
-            if(s_time.length() != 12){
-               std::cout << "invalid time: " << argv[i+1] << std::endl;
-               exit(1);
-            }
-
-            std::stringstream ss;
-            int year, month, day, hour, min;
-            ss << s_time.substr(0, 4) << std::endl;
-            ss >> year;
-            ss.str("");
-            ss << s_time.substr(4, 2) << std::endl;
-            ss >> month;
-            ss.str("");
-            ss << s_time.substr(6, 2) << std::endl;
-            ss >> day;
-            ss.str("");
-            ss << s_time.substr(8, 2) << std::endl;
-            ss >> hour;
-            ss.str("");
-            ss << s_time.substr(10, 2) << std::endl;
-            ss >> min;
-            ss.str("");
-
-            time.tm_year = year - 1900;
-            time.tm_mon = month - 1;
-            time.tm_mday = day;
-            time.tm_hour = hour;
-            time.tm_min = min;
-
-         }else{
-            std::cout << "usage: -f filename [-t] time" << std::endl;
-            exit(1);
-         }
-      }
-   }
-
-   if(filename == ""){
-      std::cout << "usage: -f filename [-t] time" << std::endl;
-      exit(1);
-   }
-
-
+   
    if (signal(SIGINT, cleanup_sigint) == SIG_ERR) {
       err(EXIT_FAILURE, "failed to register a SIGINT hook.");
    }
+   
+   std::string dirname;
+   date ctime;
+   
+   /* read args */
+   if(!(argc == 3 || argc == 5)){
+      std::cout << "usage: -d dirname [-t] time" << std::endl;
+      exit(1);
+   }
+
+
+   for(int i = 0; i < argc; i++){
+      
+      if(!strcmp("-d",argv[i])){
+         if(i + 1 < argc){
+            dirname = argv[i+1];
+         }else{
+            std::cout << "usage: -d dirname [-t] time" << std::endl;
+            exit(1);
+         }
+      }
+      
+      if(!strcmp("-t", argv[i])){
+         if( i + 1 < argc ){
+            
+            std::string s_time(argv[i+1]);
+            ctime.set_time(s_time);
+
+         }else{
+            std::cout << "usage: -d dirname [-t] time" << std::endl;
+            exit(1);
+         }
+      }
+   }
+
+   if(dirname == ""){
+      std::cout << "usage: -d dirname [-t] time" << std::endl;
+      exit(1);
+   }
+
 
    /* get new stat data */
    sockaddr_un addr;
@@ -143,166 +126,14 @@ int main(int argc, char** argv)
    }
    write(fd, "flush", sizeof("flush"));
 
-
-   /* parse exising stat data */
-   date ctime(time);
-   std::string stat, buf;
-   std::ifstream ifs(filename.c_str());
-
-   while(ifs && getline(ifs, buf)){
-      stat += buf;
-   }
-
-   json_object *jobj, *jyear, *jmonth, *jday, *jhour, *jmin;
-
-   if(stat.empty()){
-
-      jobj = json_object_new_object();
-      jyear = json_object_new_object();
-      jmonth = json_object_new_object();
-      jday = json_object_new_object();
-      jhour = json_object_new_object();
-
-      json_object_object_add(jhour, ctime.s_min().c_str(), new_jobj);
-      json_object_object_add(jday, ctime.s_hour().c_str(), jhour);
-      json_object_object_add(jmonth, ctime.s_day().c_str(), jday);
-      json_object_object_add(jyear, ctime.s_month().c_str(), jmonth);
-      json_object_object_add(jobj, ctime.s_year().c_str(), jyear);
-
-   }else{
-
-      jobj = json_tokener_parse(stat.c_str());
-
-      if(is_error(jobj)){
-         std::cout << "parse failed" <<std::endl;
-         return 0;
-      }
-      
-      std::stringstream slastyear, slastmonth, slastday, slasthour, slastmin;
-      {
-         int year = 0, temp;
-         json_object_object_foreach(jobj, key, value){
-            std::stringstream ss;
-            ss << key;
-            ss >> temp;
-            if(temp > year)
-               year = temp;
-         }
-         slastyear << year;
-
-         jyear = json_object_object_get(jobj, slastyear.str().c_str());
-      }
-      {
-         int month = 0, temp;
-         json_object_object_foreach(jyear, key, value){
-            std::stringstream ss;
-            ss << key;
-            ss >> temp;
-            if(temp > month)
-               month = temp;
-         }
-         slastmonth << month;
-
-         jmonth = json_object_object_get(jyear, slastmonth.str().c_str());
-      }
-      {
-         int day = 0, temp;
-         json_object_object_foreach(jmonth, key, value){
-            std::stringstream ss;
-            ss << key;
-            ss >> temp;
-            if(temp > day)
-               day = temp;
-         }
-         slastday << day;
-
-         jday = json_object_object_get(jmonth, slastday.str().c_str());
-      }
-      {
-         int hour = 0, temp;
-         json_object_object_foreach(jday, key, value){
-            std::stringstream ss;
-            ss << key;
-            ss >> temp;
-            if(temp > hour)
-               hour = temp;
-         }
-         slasthour << hour;
-
-         jhour = json_object_object_get(jday, slasthour.str().c_str());
-      }
-      {
-         int min = 0, temp;
-         json_object_object_foreach(jhour, key, value){
-            std::stringstream ss;
-            ss << key;
-            ss >> temp;
-            if(temp > min)
-               min = temp;
-         }
-         slastmin << min;
-      }
-
-      std::cout << "last update: " << slastyear.str() << "," <<  slastmonth.str() << "," << slastday.str() << "," << slasthour.str() << "," << slastmin.str() << std::endl;
-
-      if(ctime.s_year() == slastyear.str()){
-         if(ctime.s_month() == slastmonth.str()){
-            if(ctime.s_day() == slastday.str()){
-               if(ctime.s_hour() == slasthour.str()){
-                  if(ctime.s_min() == slastmin.str()){
-                     std::cout << "entry already exists" << std::endl;
-                     exit(1);
-                  }else{
-                     json_object_object_add(jhour, ctime.s_min().c_str(), new_jobj);
-                  }
-               }else{
-                  merge(jhour);
-                  jhour = json_object_new_object();
-                  json_object_object_add(jhour, ctime.s_min().c_str(), new_jobj);
-                  json_object_object_add(jday, ctime.s_hour().c_str(), jhour);
-               }
-            }else{
-               merge(jhour);
-               merge(jday);
-               jhour = json_object_new_object();
-               jday = json_object_new_object();
-               json_object_object_add(jhour, ctime.s_min().c_str(), new_jobj);
-               json_object_object_add(jday, ctime.s_hour().c_str(), jhour);
-               json_object_object_add(jmonth, ctime.s_day().c_str(), jday);
-            }
-         }else{
-            merge(jhour);
-            merge(jday);
-            merge(jmonth);
-            jhour = json_object_new_object();
-            jday = json_object_new_object();
-            jmonth = json_object_new_object();
-            json_object_object_add(jhour, ctime.s_min().c_str(), new_jobj);
-            json_object_object_add(jday, ctime.s_hour().c_str(), jhour);
-            json_object_object_add(jmonth, ctime.s_day().c_str(), jday);
-            json_object_object_add(jyear, ctime.s_month().c_str(), jmonth);
-         }
-      }else{
-         merge(jhour);
-         merge(jday);
-         merge(jmonth);
-         merge(jyear);
-         jhour = json_object_new_object();
-         jday = json_object_new_object();
-         jmonth = json_object_new_object();
-         jyear = json_object_new_object();
-         json_object_object_add(jhour, ctime.s_hour().c_str(), new_jobj);
-         json_object_object_add(jday, ctime.s_hour().c_str(), jhour);
-         json_object_object_add(jmonth, ctime.s_day().c_str(), jday);
-         json_object_object_add(jyear, ctime.s_month().c_str(), jmonth);
-         json_object_object_add(jobj, ctime.s_year().c_str(), jyear);
-      }
-   }
-   
-   ifs.close();
-   std::ofstream ofs(filename.c_str(), std::ios::out | std::ios::trunc);
-   ofs << json_object_to_json_string(jobj);
-
+  /* update stat files*/
+  stat_file_manager fm(dirname);
+ 
+  if(!fm.empty()){
+    fm.merge(ctime); 
+  }
+  
+  fm.add(ctime, new_jobj);
 }
 
 void cleanup_sigint(int dummy){
@@ -523,5 +354,82 @@ int merge(json_object* jobj){
    }
 
    return 0;
+}
+
+tm find_last_update(json_object* jobj, json_object* jyear, json_object* jmonth, json_object* jday, json_object* jhour){
+
+   std::stringstream slastyear, slastmonth, slastday, slasthour, slastmin;
+   tm lastupdate;
+   {
+      int year = 0, temp;
+      json_object_object_foreach(jobj, key, value){
+         std::stringstream ss;
+         ss << key;
+         ss >> temp;
+         if(temp > year)
+            year = temp;
+      }
+      slastyear << year;
+      lastupdate.tm_year = year - 1900;
+
+      jyear = json_object_object_get(jobj, slastyear.str().c_str());
+   }
+   {
+      int month = 0, temp;
+      json_object_object_foreach(jyear, key, value){
+         std::stringstream ss;
+         ss << key;
+         ss >> temp;
+         if(temp > month)
+            month = temp;
+      }
+      slastmonth << month;
+      lastupdate.tm_mon = month - 1;
+
+      jmonth = json_object_object_get(jyear, slastmonth.str().c_str());
+   }
+   {
+      int day = 0, temp;
+      json_object_object_foreach(jmonth, key, value){
+         std::stringstream ss;
+         ss << key;
+         ss >> temp;
+         if(temp > day)
+            day = temp;
+      }
+      slastday << day;
+      lastupdate.tm_mday = day;
+
+      jday = json_object_object_get(jmonth, slastday.str().c_str());
+   }
+   {
+      int hour = 0, temp;
+      json_object_object_foreach(jday, key, value){
+         std::stringstream ss;
+         ss << key;
+         ss >> temp;
+         if(temp > hour)
+            hour = temp;
+      }
+      slasthour << hour;
+      lastupdate.tm_hour = hour;
+
+      jhour = json_object_object_get(jday, slasthour.str().c_str());
+   }
+   {
+      int min = 0, temp;
+      json_object_object_foreach(jhour, key, value){
+         std::stringstream ss;
+         ss << key;
+         ss >> temp;
+         if(temp > min)
+            min = temp;
+      }
+      slastmin << min;
+      lastupdate.tm_min = min;
+   }
+
+   return lastupdate;
+
 }
 
