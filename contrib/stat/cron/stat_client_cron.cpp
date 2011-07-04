@@ -128,10 +128,13 @@ int main(int argc, char** argv)
   stat_file_manager fm(dirname);
  
   if(!fm.empty()){
-    fm.merge(ctime); 
+     std::cout <<"fm.update()" <<std::endl;
+     fm.update(ctime); 
   }
-  
-//  fm.add(ctime, new_jobj);
+
+  std::cout << "fm.write()" << std::endl;
+  fm.write(ctime.get_stime(), new_jobj);
+
 }
 
 void cleanup_sigint(int dummy){
