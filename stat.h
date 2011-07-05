@@ -82,7 +82,7 @@ namespace map646_stat{
       }
       bool operator==(const map646_in6_addr &rhs)const{
          for(int i = 0; i < 4; i++){
-            if(addr.in6_u.u6_addr32[i] != rhs.addr.in6_u.u6_addr32[i]){
+            if(addr.s6_addr32[i] != rhs.addr.s6_addr32[i]){
                return false;
             }
          }
@@ -90,18 +90,18 @@ namespace map646_stat{
       }
       bool operator<(const map646_in6_addr& rhs)const{
          for(int i = 0; i < 4; i++){
-            if(addr.in6_u.u6_addr32[i] < rhs.addr.in6_u.u6_addr32[i])
+            if(addr.s6_addr32[i] < rhs.addr.s6_addr32[i])
                return true;
-            else if(addr.in6_u.u6_addr32[i] > rhs.addr.in6_u.u6_addr32[i])
+            else if(addr.s6_addr32[i] > rhs.addr.s6_addr32[i])
                return false;
          }
          return false;
       }
       bool operator>(const map646_in6_addr &rhs)const{
          for(int i = 0; i < 4; i++){
-            if(addr.in6_u.u6_addr32[i] < rhs.addr.in6_u.u6_addr32[i])
+            if(addr.s6_addr32[i] < rhs.addr.s6_addr32[i])
                return false;
-            else if(addr.in6_u.u6_addr32[i] > rhs.addr.in6_u.u6_addr32[i])
+            else if(addr.s6_addr32[i] > rhs.addr.s6_addr32[i])
                return true;
          }
          return false;
