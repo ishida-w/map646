@@ -86,17 +86,28 @@ int main(int argc, char**argv)
          addr.sun_family = AF_UNIX;
          strcpy(addr.sun_path, STAT_SOCK); 
 
-         if(connect(fd, (sockaddr *)&addr, sizeof(addr.sun_family) + strlen(STAT_SOCK)) < 0){
+         if(connect(fd, (sockaddr *)&addr, sizeof(addr.sun_family) + strlen(STAT_SOCK)) != 0){
             perror("connect");
             exit(1);
          }
 
          std::cout << "command: send" << std::endl;
-         write(fd, "send", sizeof("send"));
+         
+         if(write(fd, "send", sizeof("send")) < 0){
+            std::cout << "write failed" << std::endl;
+            exit(1);
+         }
+         
          int n;
-         read(fd, (void *)&n, sizeof(int));
+         if(read(fd, (void *)&n, sizeof(int)) < 0){
+            std::cout << "read failed" << std::endl;
+            exit(1);
+         }
          char buf[n];
-         read(fd, buf, n);
+         if(read(fd, buf, n) < 0){
+            std::cout << "read2 failed" << std::endl;
+            exit(1);
+         }
          jobj = json_tokener_parse(buf);
          std::cout << json_object_to_json_string(jobj) << std::endl;
       }else if(command == "flush"){
@@ -112,8 +123,11 @@ int main(int argc, char**argv)
             perror("connect");
             exit(1);
          }
+         printf("hello\n");
          std::cout << "command: flush" << std::endl;
+         printf("hello2\n");
          write(fd, "flush", sizeof("flush"));
+         printf("hello3\n");
       }else if(command == "quit" || command == "q"){
          std::cout << "bye" <<std::endl;
          close(fd);

@@ -130,6 +130,9 @@ int main(int argc, char *argv[])
    sockaddr_un caddr;
    socklen_t len;
 
+   memset(&caddr, 0, sizeof(sockaddr_un));
+   memset(&len, 0, sizeof(socklen_t));
+
    stat_listen_fd = map646_stat::statif_alloc();
    if(stat_listen_fd == -1)
       err(EXIT_FAILURE, "failed to open a stat interface"); 
@@ -247,10 +250,13 @@ int main(int argc, char *argv[])
 */
 
          }else if(fd == stat_listen_fd){
+
+            std::cout << "stat_listen_fd : " << stat_listen_fd << std::endl;
             if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
-               warnx("failed to accept stat client");
-               continue;
+               err(EXIT_FAILURE, "failed to accept stat client");
             }
+
+            std::cout << "stat_fd : " << stat_fd << std::endl;
 
             epoll_event epev;
             epev.data.fd = stat_fd;
