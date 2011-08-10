@@ -47,7 +47,7 @@ int main(int argc, char **argv)
    echoServAddr.sin6_family = AF_INET6;
    echoServAddr.sin6_addr = in6addr_any;
    echoServAddr.sin6_port = htons(echoServPort);
-   
+
    /* TCP */   
    if((tcpSock = socket(PF_INET6, SOCK_STREAM, IPPROTO_TCP))<0)
       DieWithError("socket() failed");
@@ -57,7 +57,7 @@ int main(int argc, char **argv)
 
    if(listen(tcpSock, MAXPENDING) < 0)
       DieWithError("listen() failed");
-   
+
    /* UDP */
    if((udpSock = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP))<0)
       DieWithError("socket() failed");
@@ -74,15 +74,15 @@ int main(int argc, char **argv)
       perror("setsockopt(IPV6_RECVPKTINFO)");
    }
    /*
-   printf("use IPV6_PKTINFO\n");
-   rc = setsockopt(udpSock,IPPROTO_IPV6,IPV6_PKTINFO,&on,sizeof(on));
-   if(rc < 0){
+      printf("use IPV6_PKTINFO\n");
+      rc = setsockopt(udpSock,IPPROTO_IPV6,IPV6_PKTINFO,&on,sizeof(on));
+      if(rc < 0){
       perror("setsockopt(IPV6_PKTINFO)");
-   } 
-   */
+      } 
+    */
    if(bind(udpSock, (sockaddr *) &echoServAddr, sizeof(echoServAddr)) < 0)
       DieWithError("bind() failed");
-   
+
    FD_ZERO(&readfds);
    FD_SET(tcpSock, &readfds);
    FD_SET(udpSock, &readfds);
@@ -92,7 +92,7 @@ int main(int argc, char **argv)
    }else{
       maxfd = udpSock;
    }
-  
+
    unsigned int clntLen;
    sockaddr_in6 echoClntAddr;
    char addr_str[64];
@@ -101,136 +101,136 @@ int main(int argc, char **argv)
    while(1)
    {
       char echoBuffer[ECHOMAX];
-     memcpy(&fds, &readfds, sizeof(fd_set));
+      memcpy(&fds, &readfds, sizeof(fd_set));
 
-     select(maxfd + 1, &fds, NULL, NULL, NULL);
+      select(maxfd + 1, &fds, NULL, NULL, NULL);
 
-     if(FD_ISSET(tcpSock, &fds)){
-        if((clntSock = accept(tcpSock, (sockaddr *)&echoClntAddr, &clntLen)) < 0)
-           DieWithError("accept() failed");
+      if(FD_ISSET(tcpSock, &fds)){
+         if((clntSock = accept(tcpSock, (sockaddr *)&echoClntAddr, &clntLen)) < 0)
+            DieWithError("accept() failed");
 
-        if(inet_ntop(AF_INET6, (const void*)&echoClntAddr.sin6_addr, addr_str, 64) == NULL)
-           DieWithError("inet_ntop\n");
-         
-        std::cout << "[TCP] Handling client " << addr_str << std::endl;
+         if(inet_ntop(AF_INET6, (const void*)&echoClntAddr.sin6_addr, addr_str, 64) == NULL)
+            DieWithError("inet_ntop\n");
 
-        if((processID = fork()) < 0)
-           DieWithError("fork() failed");
-        else if(processID == 0){
-           
-           close(tcpSock);
+         std::cout << "[TCP] Handling client " << addr_str << std::endl;
 
-           if((recvMsgSize = recv(clntSock, echoBuffer, RCVBUFSIZE, 0)) < 0)
-              DieWithError("recv() failed");
+         if((processID = fork()) < 0)
+            DieWithError("fork() failed");
+         else if(processID == 0){
 
-           while(recvMsgSize > 0)
-           {
-              if(send(clntSock, echoBuffer, recvMsgSize, 0) != recvMsgSize)
-                 DieWithError("send() failed");
+            close(tcpSock);
 
-              if((recvMsgSize = recv(clntSock, echoBuffer, RCVBUFSIZE, 0)) < 0)
-                 DieWithError("recv() failed");
-           }
+            if((recvMsgSize = recv(clntSock, echoBuffer, RCVBUFSIZE, 0)) < 0)
+               DieWithError("recv() failed");
 
-           close(clntSock);
-           exit(0);
-        }
+            while(recvMsgSize > 0)
+            {
+               if(send(clntSock, echoBuffer, recvMsgSize, 0) != recvMsgSize)
+                  DieWithError("send() failed");
 
-//        std::cout << "with child process: " << processID << std::endl;
-        close(clntSock);
-        childProcCount++;
+               if((recvMsgSize = recv(clntSock, echoBuffer, RCVBUFSIZE, 0)) < 0)
+                  DieWithError("recv() failed");
+            }
 
-        while(childProcCount)
-        {
-           processID = waitpid((pid_t) -1, NULL, WNOHANG);
-           if(processID < 0)
-              DieWithError("waitpid() failed");
-           else if(processID == 0)
-              break;
-           else
-              childProcCount++;
-        }
-     }
+            close(clntSock);
+            exit(0);
+         }
 
-     if(FD_ISSET(udpSock, &fds)){
+         //        std::cout << "with child process: " << processID << std::endl;
+         close(clntSock);
+         childProcCount++;
 
-        socklen_t cliAddrLen = sizeof(echoClntAddr);
+         while(childProcCount)
+         {
+            processID = waitpid((pid_t) -1, NULL, WNOHANG);
+            if(processID < 0)
+               DieWithError("waitpid() failed");
+            else if(processID == 0)
+               break;
+            else
+               childProcCount++;
+         }
+      }
 
-        msghdr msg;
-        in6_pktinfo *pktinfo;
-        cmsghdr  *cmsg;
-        const int BUF_LEN = 512;
-        unsigned char buf[BUF_LEN];
-        char cbuf[512], addr[256];
-        iovec iov[1];
-        char addr_name[64];
-        sockaddr_in6 sin;
+      if(FD_ISSET(udpSock, &fds)){
 
-        iov[0].iov_base = buf;
-        iov[0].iov_len = BUF_LEN;
+         socklen_t cliAddrLen = sizeof(echoClntAddr);
 
-        memset(&sin, 0, sizeof(sin));
-        memset(&msg, 0, sizeof(msg));
-        msg.msg_name = &sin;
-        msg.msg_namelen = sizeof(sin);
-        msg.msg_iov = iov;
-        msg.msg_iovlen = 1;
-        msg.msg_control = cbuf;
-        msg.msg_controllen = 512;
+         msghdr msg;
+         in6_pktinfo *pktinfo;
+         cmsghdr  *cmsg;
+         const int BUF_LEN = 512;
+         unsigned char buf[BUF_LEN];
+         char cbuf[512], addr[256];
+         iovec iov[1];
+         char addr_name[64];
+         sockaddr_in6 sin;
 
-        recvmsg(udpSock, &msg, 0);
+         iov[0].iov_base = buf;
+         iov[0].iov_len = BUF_LEN;
 
-        for(cmsg=CMSG_FIRSTHDR(&msg); cmsg!=NULL; cmsg=CMSG_NXTHDR(&msg,cmsg)){
-           if(cmsg->cmsg_level==IPPROTO_IPV6&& cmsg->cmsg_type==IPV6_PKTINFO){
-              pktinfo=(struct in6_pktinfo *)CMSG_DATA(cmsg);
-              inet_ntop(AF_INET6, &(pktinfo->ipi6_addr), addr_name, 64);
-              std::cout << "[UDP] dst: " << addr_name << std::endl;
-           }
-        }
+         memset(&sin, 0, sizeof(sin));
+         memset(&msg, 0, sizeof(msg));
+         msg.msg_name = &sin;
+         msg.msg_namelen = sizeof(sin);
+         msg.msg_iov = iov;
+         msg.msg_iovlen = 1;
+         msg.msg_control = cbuf;
+         msg.msg_controllen = 512;
+
+         recvmsg(udpSock, &msg, 0);
+
+         for(cmsg=CMSG_FIRSTHDR(&msg); cmsg!=NULL; cmsg=CMSG_NXTHDR(&msg,cmsg)){
+            if(cmsg->cmsg_level==IPPROTO_IPV6&& cmsg->cmsg_type==IPV6_PKTINFO){
+               pktinfo=(struct in6_pktinfo *)CMSG_DATA(cmsg);
+               inet_ntop(AF_INET6, &(pktinfo->ipi6_addr), addr_name, 64);
+               std::cout << "[UDP] dst: " << addr_name << std::endl;
+            }
+         }
 
 
-        std::cout << "[UDP] source: " <<inet_ntop(AF_INET6, &(sin.sin6_addr), addr_name, 64) << std::endl;
-        std::cout << "[UDP] msg:" << buf << std::endl;
+         std::cout << "[UDP] source: " <<inet_ntop(AF_INET6, &(sin.sin6_addr), addr_name, 64) << std::endl;
+         std::cout << "[UDP] msg:" << buf << std::endl;
 
-        in6_addr source = pktinfo->ipi6_addr;
-        
-        /*prepare for sending msg */
+         in6_addr source = pktinfo->ipi6_addr;
 
-        int cmsglen = CMSG_SPACE(sizeof(*pktinfo));
-        cmsg = (cmsghdr *)malloc(cmsglen);
+         /*prepare for sending msg */
 
-        if(cmsg == NULL)
-        {
-           perror("malloc");
-           return 1;
-        }
-       
-        memset(&msg, 0, sizeof(msg));
-        memset(cmsg, 0, cmsglen);
-        memset(iov, 0, sizeof(*iov));
+         int cmsglen = CMSG_SPACE(sizeof(*pktinfo));
+         cmsg = (cmsghdr *)malloc(cmsglen);
 
-        cmsg->cmsg_len = CMSG_LEN(sizeof(*pktinfo));
-        cmsg->cmsg_level = IPPROTO_IPV6;
-        cmsg->cmsg_type = IPV6_PKTINFO;
-        pktinfo = (in6_pktinfo *)CMSG_DATA(cmsg);
+         if(cmsg == NULL)
+         {
+            perror("malloc");
+            return 1;
+         }
 
-        memset(pktinfo, 0, sizeof(*pktinfo));
-        memcpy(&pktinfo->ipi6_addr, &source, sizeof(source));
-        pktinfo->ipi6_ifindex = 0;
+         memset(&msg, 0, sizeof(msg));
+         memset(cmsg, 0, cmsglen);
+         memset(iov, 0, sizeof(*iov));
 
-        iov[0].iov_base = buf;
-        iov[0].iov_len = 512;
-        memset(&msg, 0, sizeof(msg));
-        msg.msg_control = cmsg;
-        msg.msg_controllen = cmsglen;
-        msg.msg_iov = iov;
-        msg.msg_iovlen = 1;
-        msg.msg_name = (void *)&sin;
-        msg.msg_namelen = sizeof(sin);
+         cmsg->cmsg_len = CMSG_LEN(sizeof(*pktinfo));
+         cmsg->cmsg_level = IPPROTO_IPV6;
+         cmsg->cmsg_type = IPV6_PKTINFO;
+         pktinfo = (in6_pktinfo *)CMSG_DATA(cmsg);
 
-        if(sendmsg(udpSock, &msg, 0) < 0)
-           DieWithError("send() failed");
-     }
+         memset(pktinfo, 0, sizeof(*pktinfo));
+         memcpy(&pktinfo->ipi6_addr, &source, sizeof(source));
+         pktinfo->ipi6_ifindex = 0;
+
+         iov[0].iov_base = buf;
+         iov[0].iov_len = 512;
+         memset(&msg, 0, sizeof(msg));
+         msg.msg_control = cmsg;
+         msg.msg_controllen = cmsglen;
+         msg.msg_iov = iov;
+         msg.msg_iovlen = 1;
+         msg.msg_name = (void *)&sin;
+         msg.msg_namelen = sizeof(sin);
+
+         if(sendmsg(udpSock, &msg, 0) < 0)
+            DieWithError("send() failed");
+      }
    }
 }
 

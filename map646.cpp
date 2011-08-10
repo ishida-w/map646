@@ -81,9 +81,15 @@ int stat_listen_fd, stat_fd;
 std::string map646_conf_path("/etc/map646.conf");
 map646_stat::stat map_stat;
 
+unsigned long sum;
+int ind=0;
+
+timeval start, end;
+
 int main(int argc, char *argv[])
 {
 
+   gettimeofday(&start, NULL);
    /* Configuration path option */
    if(argc == 3){
       if(!strcmp("-c", argv[1])){
@@ -176,7 +182,7 @@ int main(int argc, char *argv[])
    uint8_t *bufp;
    
 
-   bool stat_enable = true;
+   bool stat_enable = false;
    uint64_t true_time = 0, false_time = 0;
    uint64_t true_time_index = 0, false_time_index = 0;
 
@@ -198,8 +204,6 @@ int main(int argc, char *argv[])
             int d = dispatch(bufp);
             bufp += sizeof(uint32_t);
 
-//            timeval tv1, tv2;
-//            gettimeofday(&tv1, NULL);
 
             if(stat_enable == true){
                if(map_stat.update(bufp, read_len, d) < 0){
@@ -224,12 +228,14 @@ int main(int argc, char *argv[])
                   warnx("unsupported mapping");
             }
 
-//            gettimeofday(&tv2, NULL);
 /*
-            timeval time;
-            time.tv_sec = tv2.tv_sec - tv1.tv_sec;
-            time.tv_usec = tv2.tv_usec - tv1.tv_usec;
-
+            unsigned long diff;
+            diff = (tv2.tv_sec - tv1.tv_sec)*1000000;
+            diff += (tv2.tv_usec - tv1.tv_usec);
+            sum += diff;
+            ind += 1;
+*/          
+/*
             //std::cout << std::boolalpha << "time: " << time.tv_sec << "." << time.tv_usec << ", stat_enable: " << stat_enable << std::endl;
             
             if(stat_enable){
@@ -327,6 +333,12 @@ cleanup_sigint(int dummy)
    void
 cleanup(void)
 {
+   gettimeofday(&end, NULL);
+   unsigned long diff;
+   diff = (end.tv_sec - start.tv_sec)*1000000;
+   diff += (end.tv_usec - start.tv_usec);
+   std::cout << "exec time: " << diff << std::endl;
+
    if(getpid() == 0){
       std::cout << "cleanup called" << std::endl;
       if (mapping_uninstall_route() == -1) {
