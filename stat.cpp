@@ -93,7 +93,7 @@ namespace map646_stat{
          errx(EXIT_FAILURE, "failed to bind stat socket");
       }
 
-      if(listen(stat_listen_fd, 1) < 0){
+      if(listen(stat_listen_fd, 5) < 0){
          errx(EXIT_FAILURE, "failed to listen to stat socket");
       }
 
