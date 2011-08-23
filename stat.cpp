@@ -69,6 +69,7 @@
 #include <sstream>
 #include <map>
 #include <json/json.h>
+#include <sys/time.h>
 
 #include "mapping.h"
 #include "stat.h"
@@ -101,6 +102,16 @@ namespace map646_stat{
    }
 
    int stat::update(const uint8_t *bufp, ssize_t len, uint8_t d){
+      timeval currenttime;
+      gettimeofday(&currenttime, NULL);
+
+      std::cout << "diff time: " << float(currenttime.tv_sec - lastsend.tv_sec) << std::endl;
+      if(float(currenttime.tv_sec - lastsend.tv_sec)/60 > max_wait_time && max_enable){
+         warnx("stat is full. going to flush");
+         lastsend = currenttime;
+         flush();
+      }
+
       assert(bufp != NULL);
       switch(d){
          case FOURTOSIX:
@@ -130,21 +141,21 @@ namespace map646_stat{
                   break;
                }
                if(ip4_proto == IPPROTO_ICMP){
-                  stat[addr].stat_element[ICMP_IN].num++;
-                  stat[addr].stat_element[ICMP_IN].len[get_hist(ip4_plen - sizeof(icmp))]++;
+                  stat46[addr].stat_element[ICMP_IN].num++;
+                  stat46[addr].stat_element[ICMP_IN].len[get_hist(ip4_plen - sizeof(icmp))]++;
                }else if(ip4_proto == IPPROTO_TCP){
                   
-                  stat[addr].stat_element[TCP_IN].num++;
+                  stat46[addr].stat_element[TCP_IN].num++;
                   uint16_t source = ntohs(((tcphdr*)packetp)->source);
-                  stat[addr].stat_element[TCP_IN].port_stat[source]++;
-                  stat[addr].stat_element[TCP_IN].len[get_hist(ip4_plen - sizeof(tcphdr))]++;
+                  stat46[addr].stat_element[TCP_IN].port_stat[source]++;
+                  stat46[addr].stat_element[TCP_IN].len[get_hist(ip4_plen - sizeof(tcphdr))]++;
 
                }else if(ip4_proto == IPPROTO_UDP){
                   
-                  stat[addr].stat_element[UDP_IN].num++;
+                  stat46[addr].stat_element[UDP_IN].num++;
                   uint16_t source = ntohs(((udphdr*)packetp)->source);
-                  stat[addr].stat_element[UDP_IN].port_stat[source]++;
-                  stat[addr].stat_element[UDP_IN].len[get_hist(ip4_plen - sizeof(udphdr))]++;
+                  stat46[addr].stat_element[UDP_IN].port_stat[source]++;
+                  stat46[addr].stat_element[UDP_IN].len[get_hist(ip4_plen - sizeof(udphdr))]++;
 
                }
              break;
@@ -196,18 +207,18 @@ namespace map646_stat{
                }
 
                if(ip6_proto == IPPROTO_ICMPV6){
-                  stat[addr].stat_element[ICMP_OUT].num++;
-                  stat[addr].stat_element[ICMP_OUT].len[get_hist(ip6_payload_len - sizeof(icmp6_hdr))]++;
+                  stat46[addr].stat_element[ICMP_OUT].num++;
+                  stat46[addr].stat_element[ICMP_OUT].len[get_hist(ip6_payload_len - sizeof(icmp6_hdr))]++;
                }else if(ip6_proto == IPPROTO_TCP){
-                  stat[addr].stat_element[TCP_OUT].num++;
+                  stat46[addr].stat_element[TCP_OUT].num++;
                   u_int16_t source = ntohs(((tcphdr *)packetp)->source);
-                  stat[addr].stat_element[TCP_OUT].port_stat[source]++;
-                  stat[addr].stat_element[TCP_OUT].len[get_hist(ip6_payload_len - sizeof(tcphdr))]++;
+                  stat46[addr].stat_element[TCP_OUT].port_stat[source]++;
+                  stat46[addr].stat_element[TCP_OUT].len[get_hist(ip6_payload_len - sizeof(tcphdr))]++;
                }else if(ip6_proto == IPPROTO_UDP){
-                  stat[addr].stat_element[UDP_OUT].num++;
+                  stat46[addr].stat_element[UDP_OUT].num++;
                   u_int16_t source = ntohs(((udphdr *)packetp)->source);
-                  stat[addr].stat_element[UDP_OUT].port_stat[source]++;
-                  stat[addr].stat_element[UDP_OUT].len[get_hist(ip6_payload_len - sizeof(udphdr))]++;
+                  stat46[addr].stat_element[UDP_OUT].port_stat[source]++;
+                  stat46[addr].stat_element[UDP_OUT].len[get_hist(ip6_payload_len - sizeof(udphdr))]++;
                }
                break;
             }
@@ -338,9 +349,9 @@ namespace map646_stat{
    }
    
    int stat::show(){
-      std::map<map646_in_addr, stat_chunk>::iterator it = stat.begin();
+      std::map<map646_in_addr, stat_chunk>::iterator it = stat46.begin();
       std::cout << "STAT" << std::endl; 
-      while(it != stat.end()){
+      while(it != stat46.end()){
          std::cout << "4to6" << std::endl;
          std::cout << " service addr: " << it->first.get_addr() << std::endl;
          
@@ -397,14 +408,19 @@ namespace map646_stat{
 
    void stat::flush(){
       std::map<map646_in6_addr, stat_chunk>().swap(stat66);
-      std::map<map646_in_addr, stat_chunk>().swap(stat);
+      std::map<map646_in_addr, stat_chunk>().swap(stat46);
    }
 
-   int stat::send(int fd){
+   int stat::send(int fd, int from){
       std::string message(get_json());
       int size = message.size();
       write(fd, (uint8_t *)&size, sizeof(int));
       write(fd, message.c_str(), size);
+
+      const int cron = 1;
+      if(from == cron){
+         gettimeofday(&lastsend, NULL);
+      }
 
       return 0;
    }
@@ -412,13 +428,13 @@ namespace map646_stat{
    std::string stat::get_json(){
       json_object *jobj = json_object_new_object();
       
-      if(stat.empty())
+      if(stat46.empty())
          json_object_object_add(jobj, "v4", NULL);
       else{
-         std::map<map646_in_addr, stat_chunk>::iterator it = stat.begin();
+         std::map<map646_in_addr, stat_chunk>::iterator it = stat46.begin();
          json_object *v4 = json_object_new_object();
 
-         while(it != stat.end()){
+         while(it != stat46.end()){
             json_object *chunk = json_object_new_object();
             for(int i = 0; i < 6; i++){
                json_object *element = json_object_new_object();

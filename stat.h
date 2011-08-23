@@ -25,6 +25,7 @@
 
 #define STAT_SOCK "/tmp/map646_stat"
 #include <map>
+#include <sys/time.h>
 namespace map646_stat{
 
    int statif_alloc();
@@ -115,15 +116,27 @@ namespace map646_stat{
 
    class stat{
       public:
+         stat(int mwt){
+            if(mwt <= 0){
+               max_enable = false;
+            }else{
+               max_enable = true;
+            }
+            gettimeofday(&lastsend, NULL);
+            max_wait_time = mwt;
+         }
          int update(const uint8_t *bufp, ssize_t len, uint8_t d);
          int show();
          void flush();
-         int send(int fd);
+         int send(int fd, int from);
       private:
+         bool max_enable;
+         timeval lastsend;
+         int max_wait_time;
          std::string get_json();
          int get_hist(int len);
          std::map<map646_in6_addr, stat_chunk> stat66;
-         std::map<map646_in_addr, stat_chunk> stat;
+         std::map<map646_in_addr, stat_chunk> stat46;
    };
    
    std::string get_proto(int proto);

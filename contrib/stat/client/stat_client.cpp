@@ -77,7 +77,7 @@ int main(int argc, char**argv)
       std::cout << ":";
       std::cin >> command;
 
-      if(command == "send"){
+      if(command == "show"){
 
          if((fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
             perror("socket");
@@ -94,9 +94,9 @@ int main(int argc, char**argv)
             exit(1);
          }
 
-         std::cout << "command: send" << std::endl;
+         std::cout << "command: show" << std::endl;
          
-         if(write(fd, "send", sizeof("send")) < 0){
+         if(write(fd, "show", sizeof("show")) < 0){
             std::cout << "write failed" << std::endl;
             exit(1);
          }
@@ -173,7 +173,7 @@ int main(int argc, char**argv)
          std::cin >> filename;
          fm->write(filename, jobj);
       }else{
-         std::cout << "unknown command: commands are send | flush | quit | toggle | time | stat | write" << std::endl;
+         std::cout << "unknown command: commands are show | flush | quit | toggle | time | stat | write" << std::endl;
       }
    }
 

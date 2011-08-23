@@ -65,6 +65,7 @@
                         local interfaces used to transmit actual
                         packets. */
 
+const int MAX_WAIT_TIME = 1;
 
 static int send_4to6(void *, size_t);
 static int send_6to4(void *, size_t);
@@ -79,7 +80,7 @@ int tun_fd;
 int stat_listen_fd, stat_fd;
 
 std::string map646_conf_path("/etc/map646.conf");
-map646_stat::stat map_stat;
+map646_stat::stat map_stat(MAX_WAIT_TIME);
 
 unsigned long sum;
 int ind=0;
@@ -204,7 +205,6 @@ int main(int argc, char *argv[])
             int d = dispatch(bufp);
             bufp += sizeof(uint32_t);
 
-
             if(stat_enable == true){
                if(map_stat.update(bufp, read_len, d) < 0){
                   warnx("failed to update stat");
@@ -228,33 +228,6 @@ int main(int argc, char *argv[])
                   warnx("unsupported mapping");
             }
 
-/*
-            unsigned long diff;
-            diff = (tv2.tv_sec - tv1.tv_sec)*1000000;
-            diff += (tv2.tv_usec - tv1.tv_usec);
-            sum += diff;
-            ind += 1;
-*/          
-/*
-            //std::cout << std::boolalpha << "time: " << time.tv_sec << "." << time.tv_usec << ", stat_enable: " << stat_enable << std::endl;
-            
-            if(stat_enable){
-               if(true_time_index == 1000){
-                  std::cout << "enable time: " << true_time  << ", " << true_time_index << "[usec]" << std::endl;
-               }
-               //std::cout << "true_time: " << true_time << std::endl;
-               true_time += time.tv_usec;
-               true_time_index++;
-            }else{
-               if(false_time_index == 1000){
-                  std::cout << "unable time: " << false_time << ", " << false_time_index << "[usec]" << std::endl;
-               }
-               //std::cout << "false_time: "<< false_time << std::endl;
-               false_time += time.tv_usec;
-               false_time_index++;
-            }
-*/
-
          }else if(fd == stat_listen_fd){
 
             if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
@@ -273,7 +246,9 @@ int main(int argc, char *argv[])
                warnx("read() faild");
             }else{
                if(strcmp(command, "send") == 0){
-                  map_stat.send(stat_fd);
+                  map_stat.send(stat_fd, 1);
+               }else if(strcmp(command, "show") == 0){
+                  map_stat.send(stat_fd, 0);
                }else if(strcmp(command, "flush") == 0){
                   map_stat.flush();
                }else if(strcmp(command, "toggle") == 0){
