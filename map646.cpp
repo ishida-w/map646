@@ -183,8 +183,8 @@ int main(int argc, char *argv[])
    
 
    bool stat_enable = false;
-   uint64_t true_time = 0, false_time = 0;
-   uint64_t true_time_index = 0, false_time_index = 0;
+
+   std::cout << std::boolalpha << "stat_enable: " << stat_enable << std::endl;
 
    /* MAIN WHILE LOOP */ 
    while(1)
@@ -257,12 +257,9 @@ int main(int argc, char *argv[])
 
          }else if(fd == stat_listen_fd){
 
-            std::cout << "stat_listen_fd : " << stat_listen_fd << std::endl;
             if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
                err(EXIT_FAILURE, "failed to accept stat client");
             }
-
-            std::cout << "stat_fd : " << stat_fd << std::endl;
 
             epoll_event epev;
             epev.data.fd = stat_fd;
@@ -279,16 +276,10 @@ int main(int argc, char *argv[])
                   map_stat.send(stat_fd);
                }else if(strcmp(command, "flush") == 0){
                   map_stat.flush();
-                  true_time = false_time = 0;
-                  true_time_index = false_time_index = 0;
                }else if(strcmp(command, "toggle") == 0){
-                  if(stat_enable == true)
-                     stat_enable = false;
-                  else
-                     stat_enable = true;
-               }else if(strcmp(command, "time") == 0){
-                  //std::cout << "stat_enabled: " << true_time/(double)true_time_index << "[usec]" << std::endl;
-                  //std::cout << "stat_unabled: " << false_time/(double)false_time_index << "[usec]" << std::endl;
+                  stat_enable = !stat_enable;
+                  map_stat.flush();
+                  write(fd, (bool *)&stat_enable, sizeof(bool));
                }else{
                   std::cout << "unknown command" << std::endl;
                }

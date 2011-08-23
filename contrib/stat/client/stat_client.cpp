@@ -41,30 +41,33 @@ int main(int argc, char**argv)
    date ctime;
    
    /* read args */
-   if(!(argc == 3)){
-      std::cout << "usage: -d dirname"  << std::endl;
+   if(!(argc == 3 || argc == 1) ){
+      std::cout << "usage: [-d] stat_dir"  << std::endl;
       exit(1);
    }
 
 
    for(int i = 0; i < argc; i++){
-      
       if(!strcmp("-d",argv[i])){
          if(i + 1 < argc){
             dirname = argv[i+1];
+            if(dirname == ""){
+               std::cout << "usage: [-d] stat_dir" << std::endl;
+               exit(1);
+            }
          }else{
-            std::cout << "usage: -d dirname" << std::endl;
+            std::cout << "usage: [-d] stat_dir" << std::endl;
             exit(1);
          }
       }
    }
 
-   if(dirname == ""){
-      std::cout << "usage: -d dirname" << std::endl;
-      exit(1);
-   }
+   stat_file_manager *fm;
 
-   stat_file_manager fm(dirname);
+   if(dirname != ""){
+      fm = new stat_file_manager(dirname);
+   }
+   
    json_object *jobj;
 
    
@@ -123,11 +126,8 @@ int main(int argc, char**argv)
             perror("connect");
             exit(1);
          }
-         printf("hello\n");
          std::cout << "command: flush" << std::endl;
-         printf("hello2\n");
          write(fd, "flush", sizeof("flush"));
-         printf("hello3\n");
       }else if(command == "quit" || command == "q"){
          std::cout << "bye" <<std::endl;
          close(fd);
@@ -146,6 +146,9 @@ int main(int argc, char**argv)
          }
          std::cout << "command: toggle" << std::endl;
          write(fd, "toggle", sizeof("toggle"));
+         bool b;
+         read(fd, (void*)&b, sizeof(bool));
+         std::cout << std::boolalpha << "after toggle: " << b << std::endl;
 
       }else if(command == "time"){
          if((fd = socket(PF_UNIX, SOCK_STREAM, 0)) < 0){
@@ -163,12 +166,12 @@ int main(int argc, char**argv)
          write(fd, "time", sizeof("time"));
 
       }else if(command == "stat"){
-         fm.show();
+         fm->show();
       }else if(command == "write"){
          std::string filename;
          std::cout << "->filaname:";
          std::cin >> filename;
-         fm.write(filename, jobj);
+         fm->write(filename, jobj);
       }else{
          std::cout << "unknown command: commands are send | flush | quit | toggle | time | stat | write" << std::endl;
       }
