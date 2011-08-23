@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
    uint8_t *bufp;
    
 
-   bool stat_enable = true;
+   bool stat_enable = false;
    uint64_t true_time = 0, false_time = 0;
    uint64_t true_time_index = 0, false_time_index = 0;
 
