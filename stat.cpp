@@ -102,6 +102,7 @@ namespace map646_stat{
    }
 
    int stat::update(const uint8_t *bufp, ssize_t len, uint8_t d){
+/*
       timeval currenttime;
       gettimeofday(&currenttime, NULL);
 
@@ -111,7 +112,7 @@ namespace map646_stat{
          lastsend = currenttime;
          flush();
       }
-
+*/
       assert(bufp != NULL);
       switch(d){
          case FOURTOSIX:
@@ -136,7 +137,7 @@ namespace map646_stat{
                /* Check the packet size. */
                if (ip4_tlen > len) {
                   /* Data is too short.  Drop it. */
-                  warnx("Insufficient data supplied (%ld), while IP header says (%d)",
+                  warnx("Insufficient data supplied (%d), while IP header says (%d)",
                         len, ip4_tlen);
                   break;
                }
@@ -201,7 +202,7 @@ namespace map646_stat{
                /* Check the packet size. */
                if (ip6_payload_len + (ssize_t)sizeof(ip6_hdr) > len) {
                   /* Data is too short.  Drop it. */
-                  warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+                  warnx("Insufficient data supplied (%d), while IP header says (%d)",
                         len, ip6_payload_len + sizeof(ip6_hdr));
                   break;
                }
@@ -259,7 +260,7 @@ namespace map646_stat{
                /* Check the packet size. */
                if (ip6_payload_len + (ssize_t)sizeof(ip6_hdr) > len) {
                   /* Data is too short.  Drop it. */
-                  warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+                  warnx("Insufficient data supplied (%d), while IP header says (%d)",
                         len, ip6_payload_len + sizeof(ip6_hdr));
                   break;
                }
@@ -321,7 +322,7 @@ namespace map646_stat{
                /* Check the packet size. */
                if (ip6_payload_len + (ssize_t)sizeof(ip6_hdr) > len) {
                   /* Data is too short.  Drop it. */
-                  warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+                  warnx("Insufficient data supplied (%d), while IP header says (%d)",
                         len, ip6_payload_len + sizeof(ip6_hdr));
                   break;
                }
@@ -411,16 +412,11 @@ namespace map646_stat{
       std::map<map646_in_addr, stat_chunk>().swap(stat46);
    }
 
-   int stat::send(int fd, int from){
+   int stat::send(int fd){
       std::string message(get_json());
       int size = message.size();
       write(fd, (uint8_t *)&size, sizeof(int));
       write(fd, message.c_str(), size);
-
-      const int cron = 1;
-      if(from == cron){
-         gettimeofday(&lastsend, NULL);
-      }
 
       return 0;
    }

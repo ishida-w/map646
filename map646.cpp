@@ -80,17 +80,11 @@ int tun_fd;
 int stat_listen_fd, stat_fd;
 
 std::string map646_conf_path("/etc/map646.conf");
-map646_stat::stat map_stat(MAX_WAIT_TIME);
-
-unsigned long sum;
-int ind=0;
-
-timeval start, end;
+map646_stat::stat map_stat;
 
 int main(int argc, char *argv[])
 {
 
-   gettimeofday(&start, NULL);
    /* Configuration path option */
    if(argc == 3){
       if(!strcmp("-c", argv[1])){
@@ -246,9 +240,9 @@ int main(int argc, char *argv[])
                warnx("read() faild");
             }else{
                if(strcmp(command, "send") == 0){
-                  map_stat.send(stat_fd, 1);
+                  map_stat.send(stat_fd);
                }else if(strcmp(command, "show") == 0){
-                  map_stat.send(stat_fd, 0);
+                  map_stat.send(stat_fd);
                }else if(strcmp(command, "flush") == 0){
                   map_stat.flush();
                }else if(strcmp(command, "toggle") == 0){
@@ -299,12 +293,6 @@ cleanup_sigint(int dummy)
    void
 cleanup(void)
 {
-   gettimeofday(&end, NULL);
-   unsigned long diff;
-   diff = (end.tv_sec - start.tv_sec)*1000000;
-   diff += (end.tv_usec - start.tv_usec);
-   std::cout << "exec time: " << diff << std::endl;
-
    if(getpid() == 0){
       std::cout << "cleanup called" << std::endl;
       if (mapping_uninstall_route() == -1) {
@@ -395,7 +383,7 @@ send_4to6(void *datap, size_t data_len)
    /* Check the packet size. */
    if (ip4_tlen > data_len) {
       /* Data is too short.  Drop it. */
-      warnx("Insufficient data supplied (%ld), while IP header says (%d)",
+      warnx("Insufficient data supplied (%d), while IP header says (%d)",
             data_len, ip4_tlen);
       return (-1);
    }
@@ -772,7 +760,7 @@ send_6to4(void *datap, size_t data_len)
    /* Check the packet size. */
    if (ip6_payload_len + sizeof(struct ip6_hdr) > data_len) {
       /* Data is too short.  Drop it. */
-      warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+      warnx("Insufficient data supplied (%d), while IP header says (%d)",
             data_len, ip6_payload_len + sizeof(struct ip6_hdr));
       return (-1);
    }
@@ -1084,7 +1072,7 @@ send66_ItoG(void *datap, size_t data_len)
    /* Check the packet size. */
    if (ip6_payload_len + sizeof(struct ip6_hdr) > data_len) {
       /* Data is too short.  Drop it. */
-      warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+      warnx("Insufficient data supplied (%d), while IP header says (%d)",
             data_len, ip6_payload_len + sizeof(struct ip6_hdr));
       return (-1);
    }
@@ -1226,7 +1214,7 @@ send66_GtoI(void *datap, size_t data_len)
    /* Check the packet size. */
    if (ip6_payload_len + sizeof(struct ip6_hdr) > data_len) {
       /* Data is too short.  Drop it. */
-      warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+      warnx("Insufficient data supplied (%d), while IP header says (%d)",
             data_len, ip6_payload_len + sizeof(struct ip6_hdr));
       return (-1);
    }
