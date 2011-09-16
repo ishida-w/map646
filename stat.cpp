@@ -69,6 +69,7 @@
 #include <sstream>
 #include <map>
 #include <json/json.h>
+#include <sys/time.h>
 
 #include "mapping.h"
 #include "stat.h"
@@ -101,6 +102,17 @@ namespace map646_stat{
    }
 
    int stat::update(const uint8_t *bufp, ssize_t len, uint8_t d){
+/*
+      timeval currenttime;
+      gettimeofday(&currenttime, NULL);
+
+      std::cout << "diff time: " << float(currenttime.tv_sec - lastsend.tv_sec) << std::endl;
+      if(float(currenttime.tv_sec - lastsend.tv_sec)/60 > max_wait_time && max_enable){
+         warnx("stat is full. going to flush");
+         lastsend = currenttime;
+         flush();
+      }
+*/
       assert(bufp != NULL);
       switch(d){
          case FOURTOSIX:
@@ -125,26 +137,26 @@ namespace map646_stat{
                /* Check the packet size. */
                if (ip4_tlen > len) {
                   /* Data is too short.  Drop it. */
-                  warnx("Insufficient data supplied (%ld), while IP header says (%d)",
+                  warnx("Insufficient data supplied (%d), while IP header says (%d)",
                         len, ip4_tlen);
                   break;
                }
                if(ip4_proto == IPPROTO_ICMP){
-                  stat[addr].stat_element[ICMP_IN].num++;
-                  stat[addr].stat_element[ICMP_IN].len[get_hist(ip4_plen - sizeof(icmp))]++;
+                  stat46[addr].stat_element[ICMP_IN].num++;
+                  stat46[addr].stat_element[ICMP_IN].len[get_hist(ip4_plen - sizeof(icmp))]++;
                }else if(ip4_proto == IPPROTO_TCP){
                   
-                  stat[addr].stat_element[TCP_IN].num++;
+                  stat46[addr].stat_element[TCP_IN].num++;
                   uint16_t source = ntohs(((tcphdr*)packetp)->source);
-                  stat[addr].stat_element[TCP_IN].port_stat[source]++;
-                  stat[addr].stat_element[TCP_IN].len[get_hist(ip4_plen - sizeof(tcphdr))]++;
+                  stat46[addr].stat_element[TCP_IN].port_stat[source]++;
+                  stat46[addr].stat_element[TCP_IN].len[get_hist(ip4_plen - sizeof(tcphdr))]++;
 
                }else if(ip4_proto == IPPROTO_UDP){
                   
-                  stat[addr].stat_element[UDP_IN].num++;
+                  stat46[addr].stat_element[UDP_IN].num++;
                   uint16_t source = ntohs(((udphdr*)packetp)->source);
-                  stat[addr].stat_element[UDP_IN].port_stat[source]++;
-                  stat[addr].stat_element[UDP_IN].len[get_hist(ip4_plen - sizeof(udphdr))]++;
+                  stat46[addr].stat_element[UDP_IN].port_stat[source]++;
+                  stat46[addr].stat_element[UDP_IN].len[get_hist(ip4_plen - sizeof(udphdr))]++;
 
                }
              break;
@@ -190,24 +202,24 @@ namespace map646_stat{
                /* Check the packet size. */
                if (ip6_payload_len + (ssize_t)sizeof(ip6_hdr) > len) {
                   /* Data is too short.  Drop it. */
-                  warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+                  warnx("Insufficient data supplied (%d), while IP header says (%d)",
                         len, ip6_payload_len + sizeof(ip6_hdr));
                   break;
                }
 
                if(ip6_proto == IPPROTO_ICMPV6){
-                  stat[addr].stat_element[ICMP_OUT].num++;
-                  stat[addr].stat_element[ICMP_OUT].len[get_hist(ip6_payload_len - sizeof(icmp6_hdr))]++;
+                  stat46[addr].stat_element[ICMP_OUT].num++;
+                  stat46[addr].stat_element[ICMP_OUT].len[get_hist(ip6_payload_len - sizeof(icmp6_hdr))]++;
                }else if(ip6_proto == IPPROTO_TCP){
-                  stat[addr].stat_element[TCP_OUT].num++;
+                  stat46[addr].stat_element[TCP_OUT].num++;
                   u_int16_t source = ntohs(((tcphdr *)packetp)->source);
-                  stat[addr].stat_element[TCP_OUT].port_stat[source]++;
-                  stat[addr].stat_element[TCP_OUT].len[get_hist(ip6_payload_len - sizeof(tcphdr))]++;
+                  stat46[addr].stat_element[TCP_OUT].port_stat[source]++;
+                  stat46[addr].stat_element[TCP_OUT].len[get_hist(ip6_payload_len - sizeof(tcphdr))]++;
                }else if(ip6_proto == IPPROTO_UDP){
-                  stat[addr].stat_element[UDP_OUT].num++;
+                  stat46[addr].stat_element[UDP_OUT].num++;
                   u_int16_t source = ntohs(((udphdr *)packetp)->source);
-                  stat[addr].stat_element[UDP_OUT].port_stat[source]++;
-                  stat[addr].stat_element[UDP_OUT].len[get_hist(ip6_payload_len - sizeof(udphdr))]++;
+                  stat46[addr].stat_element[UDP_OUT].port_stat[source]++;
+                  stat46[addr].stat_element[UDP_OUT].len[get_hist(ip6_payload_len - sizeof(udphdr))]++;
                }
                break;
             }
@@ -248,7 +260,7 @@ namespace map646_stat{
                /* Check the packet size. */
                if (ip6_payload_len + (ssize_t)sizeof(ip6_hdr) > len) {
                   /* Data is too short.  Drop it. */
-                  warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+                  warnx("Insufficient data supplied (%d), while IP header says (%d)",
                         len, ip6_payload_len + sizeof(ip6_hdr));
                   break;
                }
@@ -310,7 +322,7 @@ namespace map646_stat{
                /* Check the packet size. */
                if (ip6_payload_len + (ssize_t)sizeof(ip6_hdr) > len) {
                   /* Data is too short.  Drop it. */
-                  warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+                  warnx("Insufficient data supplied (%d), while IP header says (%d)",
                         len, ip6_payload_len + sizeof(ip6_hdr));
                   break;
                }
@@ -338,9 +350,9 @@ namespace map646_stat{
    }
    
    int stat::show(){
-      std::map<map646_in_addr, stat_chunk>::iterator it = stat.begin();
+      std::map<map646_in_addr, stat_chunk>::iterator it = stat46.begin();
       std::cout << "STAT" << std::endl; 
-      while(it != stat.end()){
+      while(it != stat46.end()){
          std::cout << "4to6" << std::endl;
          std::cout << " service addr: " << it->first.get_addr() << std::endl;
          
@@ -397,28 +409,66 @@ namespace map646_stat{
 
    void stat::flush(){
       std::map<map646_in6_addr, stat_chunk>().swap(stat66);
-      std::map<map646_in_addr, stat_chunk>().swap(stat);
+      std::map<map646_in_addr, stat_chunk>().swap(stat46);
    }
 
-   int stat::send(int fd){
-      std::string message(get_json());
-      int size = message.size();
-      write(fd, (uint8_t *)&size, sizeof(int));
-      write(fd, message.c_str(), size);
+   int stat::safe_write(int fd, std::string msg){
+      int size = msg.size();
+      std::stringstream ss;
+      ss << size;
+      if(write(fd, ss.str().c_str(), ss.str().length()) < 0){
+         return -1;
+      }else{
+         char ack[10];
+         memset(ack, 0, 10);
+         read(fd, ack, 10);
+         if(strcmp(ack, "ok") == 0){
+            if(write(fd, msg.c_str(), size) < 0){
+               return -1;
+            }
+         }else{
+            return -1;
+         }
+      }
 
       return 0;
+   }
+
+   int stat::write_stat(int fd){
+      return safe_write(fd, get_json());
+
+   }
+
+   int stat::write_info(int fd){
+      std::stringstream ss;
+      ss << "stat46_size: " << stat46.size() << std::endl;
+
+      std::map<map646_in_addr, stat_chunk>::iterator it = stat46.begin();
+      while(it != stat46.end()){
+         ss << "service addr: " << it->first.get_addr() << ", num: " << it->second.total_num() << std::endl;
+         it++;
+      }
+
+      ss << "stat66_size: " << stat66.size() << std::endl;
+      std::map<map646_in6_addr, stat_chunk>::iterator it6 = stat66.begin();
+      while(it6 != stat66.end()){
+         ss << "service addr: " << it6->first.get_addr() << ", num: " << it->second.total_num() << std::endl;
+         it6++;
+      }
+
+      return safe_write(fd, ss.str());
    }
    
    std::string stat::get_json(){
       json_object *jobj = json_object_new_object();
       
-      if(stat.empty())
+      if(stat46.empty())
          json_object_object_add(jobj, "v4", NULL);
       else{
-         std::map<map646_in_addr, stat_chunk>::iterator it = stat.begin();
+         std::map<map646_in_addr, stat_chunk>::iterator it = stat46.begin();
          json_object *v4 = json_object_new_object();
 
-         while(it != stat.end()){
+         while(it != stat46.end()){
             json_object *chunk = json_object_new_object();
             for(int i = 0; i < 6; i++){
                json_object *element = json_object_new_object();

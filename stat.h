@@ -25,6 +25,7 @@
 
 #define STAT_SOCK "/tmp/map646_stat"
 #include <map>
+#include <sys/time.h>
 namespace map646_stat{
 
    int statif_alloc();
@@ -45,6 +46,14 @@ namespace map646_stat{
          std::map<int, int> len;
          std::map<int, int> port_stat;
       }stat_element[6];
+
+      int total_num(){
+         int total_num = 0;
+         for(int i = 0; i < 6; i++){
+            total_num += stat_element[i].num;
+         }
+         return total_num;
+      }
 
    };
 
@@ -106,6 +115,7 @@ namespace map646_stat{
          }
          return false;
       }
+      
       std::string get_addr()const{
          char str[256];
          inet_ntop(AF_INET6, &addr, str, 256);
@@ -118,12 +128,18 @@ namespace map646_stat{
          int update(const uint8_t *bufp, ssize_t len, uint8_t d);
          int show();
          void flush();
-         int send(int fd);
+         int write_stat(int fd);
+         int write_info(int fd);
+         /*
+          *  int safe_write(int fd, std::string msg)
+          *  communicate with stat_client and send the msg size before send the msg itself 
+          */
+         int safe_write(int fd, std::string msg);
       private:
          std::string get_json();
          int get_hist(int len);
          std::map<map646_in6_addr, stat_chunk> stat66;
-         std::map<map646_in_addr, stat_chunk> stat;
+         std::map<map646_in_addr, stat_chunk> stat46;
    };
    
    std::string get_proto(int proto);

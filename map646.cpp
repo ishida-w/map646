@@ -65,7 +65,6 @@
                         local interfaces used to transmit actual
                         packets. */
 
-
 static int send_4to6(void *, size_t);
 static int send_6to4(void *, size_t);
 static int send66_GtoI(void *, size_t);
@@ -81,15 +80,9 @@ int stat_listen_fd, stat_fd;
 std::string map646_conf_path("/etc/map646.conf");
 map646_stat::stat map_stat;
 
-unsigned long sum;
-int ind=0;
-
-timeval start, end;
-
 int main(int argc, char *argv[])
 {
 
-   gettimeofday(&start, NULL);
    /* Configuration path option */
    if(argc == 3){
       if(!strcmp("-c", argv[1])){
@@ -181,10 +174,9 @@ int main(int argc, char *argv[])
    uint8_t buf[BUF_LEN];
    uint8_t *bufp;
    
-
    bool stat_enable = false;
-   uint64_t true_time = 0, false_time = 0;
-   uint64_t true_time_index = 0, false_time_index = 0;
+
+   std::cout << std::boolalpha << "stat_enable: " << stat_enable << std::endl;
 
    /* MAIN WHILE LOOP */ 
    while(1)
@@ -192,8 +184,9 @@ int main(int argc, char *argv[])
       int res;
       int timeout = -1;
       struct epoll_event events[nfiles];
-      if((res = epoll_wait(epfd, events, nfiles, timeout)) == -1)
+      if((res = epoll_wait(epfd, events, nfiles, timeout)) == -1){
          errx(EXIT_FAILURE,"epoll_wait() failed ");
+      }
 
       for(int i = 0; i < res; i++){
          int fd = events[i].data.fd;
@@ -203,7 +196,6 @@ int main(int argc, char *argv[])
             bufp = buf;
             int d = dispatch(bufp);
             bufp += sizeof(uint32_t);
-
 
             if(stat_enable == true){
                if(map_stat.update(bufp, read_len, d) < 0){
@@ -228,78 +220,60 @@ int main(int argc, char *argv[])
                   warnx("unsupported mapping");
             }
 
-/*
-            unsigned long diff;
-            diff = (tv2.tv_sec - tv1.tv_sec)*1000000;
-            diff += (tv2.tv_usec - tv1.tv_usec);
-            sum += diff;
-            ind += 1;
-*/          
-/*
-            //std::cout << std::boolalpha << "time: " << time.tv_sec << "." << time.tv_usec << ", stat_enable: " << stat_enable << std::endl;
-            
-            if(stat_enable){
-               if(true_time_index == 1000){
-                  std::cout << "enable time: " << true_time  << ", " << true_time_index << "[usec]" << std::endl;
-               }
-               //std::cout << "true_time: " << true_time << std::endl;
-               true_time += time.tv_usec;
-               true_time_index++;
-            }else{
-               if(false_time_index == 1000){
-                  std::cout << "unable time: " << false_time << ", " << false_time_index << "[usec]" << std::endl;
-               }
-               //std::cout << "false_time: "<< false_time << std::endl;
-               false_time += time.tv_usec;
-               false_time_index++;
-            }
-*/
-
          }else if(fd == stat_listen_fd){
-
-            std::cout << "stat_listen_fd : " << stat_listen_fd << std::endl;
             if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
-               err(EXIT_FAILURE, "failed to accept stat client");
+               warnx("failed to accept stat client");
+               break;
             }
-
-            std::cout << "stat_fd : " << stat_fd << std::endl;
-
             epoll_event epev;
             epev.data.fd = stat_fd;
             epev.events = EPOLLIN;
             if(epoll_ctl(epfd, EPOLL_CTL_ADD, stat_fd, &epev) == -1)
                warnx("epoll_ctr failed()");
          }else{
-            const int COMMAND_SIZE = 100;
+            const int COMMAND_SIZE = 10;
             char command[COMMAND_SIZE];
-            if(read(fd, command, COMMAND_SIZE) < 0){
+            std::string list("show, info, flush, toggle, help, stat_enable");
+            memset(command, 0, COMMAND_SIZE);
+            int size;
+            if((size = read(fd, command, COMMAND_SIZE)) < 0){
                warnx("read() faild");
-            }else{
-               if(strcmp(command, "send") == 0){
-                  map_stat.send(stat_fd);
+            }else if(size != 0){
+               if(strcmp(command, "show") == 0){
+                  map_stat.write_stat(stat_fd);
+               }else if(strcmp(command, "info") == 0){
+                  map_stat.write_info(stat_fd);
                }else if(strcmp(command, "flush") == 0){
                   map_stat.flush();
-                  true_time = false_time = 0;
-                  true_time_index = false_time_index = 0;
+                  map_stat.safe_write(fd, std::string("flushed"));
                }else if(strcmp(command, "toggle") == 0){
-                  if(stat_enable == true)
-                     stat_enable = false;
-                  else
-                     stat_enable = true;
-               }else if(strcmp(command, "time") == 0){
-                  //std::cout << "stat_enabled: " << true_time/(double)true_time_index << "[usec]" << std::endl;
-                  //std::cout << "stat_unabled: " << false_time/(double)false_time_index << "[usec]" << std::endl;
+                  stat_enable = !stat_enable;
+                  if(stat_enable){
+                     map_stat.safe_write(fd, std::string("true"));
+                  }else{
+                     map_stat.safe_write(fd, std::string("false"));
+                  }
+               }else if(strcmp(command, "stat_enable") == 0){
+                  if(stat_enable){
+                     map_stat.safe_write(fd, std::string("true"));
+                  }else{
+                     map_stat.safe_write(fd, std::string("false"));
+                  }
+               }else if(strcmp(command, "help") == 0){
+                  map_stat.safe_write(fd, list);
                }else{
-                  std::cout << "unknown command" << std::endl;
+                  std::string msg("unknown commands: ");
+                  msg += list;
+                  map_stat.safe_write(fd, msg);
                }
-
-               epoll_event epev;
-               epev.data.fd = fd;
-               if(epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &epev) == -1){
-                  perror("epoll_ctl() EPOLL_CTL_DEL failed");
-               }
-               close(fd);
             }
+
+            epoll_event epev;
+            epev.data.fd = fd;
+            if(epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &epev) == -1){
+               perror("epoll_ctl() EPOLL_CTL_DEL failed");
+            }
+            close(fd);
          }
       }
    }
@@ -333,12 +307,6 @@ cleanup_sigint(int dummy)
    void
 cleanup(void)
 {
-   gettimeofday(&end, NULL);
-   unsigned long diff;
-   diff = (end.tv_sec - start.tv_sec)*1000000;
-   diff += (end.tv_usec - start.tv_usec);
-   std::cout << "exec time: " << diff << std::endl;
-
    if(getpid() == 0){
       std::cout << "cleanup called" << std::endl;
       if (mapping_uninstall_route() == -1) {
@@ -429,7 +397,7 @@ send_4to6(void *datap, size_t data_len)
    /* Check the packet size. */
    if (ip4_tlen > data_len) {
       /* Data is too short.  Drop it. */
-      warnx("Insufficient data supplied (%ld), while IP header says (%d)",
+      warnx("Insufficient data supplied (%d), while IP header says (%d)",
             data_len, ip4_tlen);
       return (-1);
    }
@@ -806,7 +774,7 @@ send_6to4(void *datap, size_t data_len)
    /* Check the packet size. */
    if (ip6_payload_len + sizeof(struct ip6_hdr) > data_len) {
       /* Data is too short.  Drop it. */
-      warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+      warnx("Insufficient data supplied (%d), while IP header says (%d)",
             data_len, ip6_payload_len + sizeof(struct ip6_hdr));
       return (-1);
    }
@@ -1118,7 +1086,7 @@ send66_ItoG(void *datap, size_t data_len)
    /* Check the packet size. */
    if (ip6_payload_len + sizeof(struct ip6_hdr) > data_len) {
       /* Data is too short.  Drop it. */
-      warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+      warnx("Insufficient data supplied (%d), while IP header says (%d)",
             data_len, ip6_payload_len + sizeof(struct ip6_hdr));
       return (-1);
    }
@@ -1260,7 +1228,7 @@ send66_GtoI(void *datap, size_t data_len)
    /* Check the packet size. */
    if (ip6_payload_len + sizeof(struct ip6_hdr) > data_len) {
       /* Data is too short.  Drop it. */
-      warnx("Insufficient data supplied (%ld), while IP header says (%ld)",
+      warnx("Insufficient data supplied (%d), while IP header says (%d)",
             data_len, ip6_payload_len + sizeof(struct ip6_hdr));
       return (-1);
    }
