@@ -65,8 +65,6 @@
                         local interfaces used to transmit actual
                         packets. */
 
-const int MAX_WAIT_TIME = 1;
-
 static int send_4to6(void *, size_t);
 static int send_6to4(void *, size_t);
 static int send66_GtoI(void *, size_t);
@@ -176,7 +174,6 @@ int main(int argc, char *argv[])
    uint8_t buf[BUF_LEN];
    uint8_t *bufp;
    
-
    bool stat_enable = false;
 
    std::cout << std::boolalpha << "stat_enable: " << stat_enable << std::endl;
@@ -187,8 +184,9 @@ int main(int argc, char *argv[])
       int res;
       int timeout = -1;
       struct epoll_event events[nfiles];
-      if((res = epoll_wait(epfd, events, nfiles, timeout)) == -1)
+      if((res = epoll_wait(epfd, events, nfiles, timeout)) == -1){
          errx(EXIT_FAILURE,"epoll_wait() failed ");
+      }
 
       for(int i = 0; i < res; i++){
          int fd = events[i].data.fd;
@@ -223,43 +221,54 @@ int main(int argc, char *argv[])
             }
 
          }else if(fd == stat_listen_fd){
-
             if((stat_fd = accept(stat_listen_fd, (sockaddr *)&caddr, &len)) < 0){
-               err(EXIT_FAILURE, "failed to accept stat client");
+               warnx("failed to accept stat client");
+               break;
             }
-
             epoll_event epev;
             epev.data.fd = stat_fd;
             epev.events = EPOLLIN;
             if(epoll_ctl(epfd, EPOLL_CTL_ADD, stat_fd, &epev) == -1)
                warnx("epoll_ctr failed()");
          }else{
-            const int COMMAND_SIZE = 100;
+            const int COMMAND_SIZE = 10;
             char command[COMMAND_SIZE];
-            if(read(fd, command, COMMAND_SIZE) < 0){
+            std::string list("show, info, flush, toggle, help, quit");
+            memset(command, 0, COMMAND_SIZE);
+            int size;
+            if((size = read(fd, command, COMMAND_SIZE)) < 0){
                warnx("read() faild");
-            }else{
-               if(strcmp(command, "send") == 0){
-                  map_stat.send(stat_fd);
-               }else if(strcmp(command, "show") == 0){
-                  map_stat.send(stat_fd);
+            }else if(size != 0){
+               if(strcmp(command, "show") == 0){
+                  map_stat.write_stat(stat_fd);
+               }else if(strcmp(command, "info") == 0){
+                  map_stat.write_info(stat_fd);
                }else if(strcmp(command, "flush") == 0){
                   map_stat.flush();
+                  map_stat.safe_write(fd, std::string("flushed"));
                }else if(strcmp(command, "toggle") == 0){
                   stat_enable = !stat_enable;
                   map_stat.flush();
-                  write(fd, (bool *)&stat_enable, sizeof(bool));
+                  if(stat_enable){
+                     map_stat.safe_write(fd, std::string("true"));
+                  }else{
+                     map_stat.safe_write(fd, std::string("false"));
+                  }
+               }else if(strcmp(command, "help") == 0){
+                  map_stat.safe_write(fd, list);
                }else{
-                  std::cout << "unknown command" << std::endl;
+                  std::string msg("unknown commands: ");
+                  msg += list;
+                  map_stat.safe_write(fd, msg);
                }
-
-               epoll_event epev;
-               epev.data.fd = fd;
-               if(epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &epev) == -1){
-                  perror("epoll_ctl() EPOLL_CTL_DEL failed");
-               }
-               close(fd);
             }
+
+            epoll_event epev;
+            epev.data.fd = fd;
+            if(epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &epev) == -1){
+               perror("epoll_ctl() EPOLL_CTL_DEL failed");
+            }
+            close(fd);
          }
       }
    }

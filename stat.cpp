@@ -412,13 +412,51 @@ namespace map646_stat{
       std::map<map646_in_addr, stat_chunk>().swap(stat46);
    }
 
-   int stat::send(int fd){
-      std::string message(get_json());
-      int size = message.size();
-      write(fd, (uint8_t *)&size, sizeof(int));
-      write(fd, message.c_str(), size);
+   int stat::safe_write(int fd, std::string msg){
+      int size = msg.size();
+      std::stringstream ss;
+      ss << size;
+      if(write(fd, ss.str().c_str(), ss.str().length()) < 0){
+         return -1;
+      }else{
+         char ack[10];
+         memset(ack, 0, 10);
+         read(fd, ack, 10);
+         if(strcmp(ack, "ok") == 0){
+            if(write(fd, msg.c_str(), size) < 0){
+               return -1;
+            }
+         }else{
+            return -1;
+         }
+      }
 
       return 0;
+   }
+
+   int stat::write_stat(int fd){
+      return safe_write(fd, get_json());
+
+   }
+
+   int stat::write_info(int fd){
+      std::stringstream ss;
+      ss << "stat46_size: " << stat46.size() << std::endl;
+
+      std::map<map646_in_addr, stat_chunk>::iterator it = stat46.begin();
+      while(it != stat46.end()){
+         ss << "service addr: " << it->first.get_addr() << ", num: " << it->second.total_num() << std::endl;
+         it++;
+      }
+
+      ss << "stat66_size: " << stat66.size() << std::endl;
+      std::map<map646_in6_addr, stat_chunk>::iterator it6 = stat66.begin();
+      while(it6 != stat66.end()){
+         ss << "service addr: " << it6->first.get_addr() << ", num: " << it->second.total_num() << std::endl;
+         it6++;
+      }
+
+      return safe_write(fd, ss.str());
    }
    
    std::string stat::get_json(){
