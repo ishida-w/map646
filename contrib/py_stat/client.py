@@ -26,9 +26,19 @@ def time_struct_to_str(tm):
    mn = a0ifnec(str(tm.tm_min))
    return year+mon+mday+hour+mn
 
+<<<<<<< HEAD
 def main(argvs):
    argc = len(argvs)
    command_index = range(0,argc)
+=======
+         command = raw_input('>> ')
+         s.send(command)
+         size = int(s.recv(1024))
+         #if size is too bad, a client can deny incoming data to receive
+         s.send("ok")
+         msg = s.recv(size)
+         print msg
+>>>>>>> temp
 
    try:
       i = argvs.index("-d")
