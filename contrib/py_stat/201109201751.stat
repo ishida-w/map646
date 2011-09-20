@@ -1,1 +1,0 @@
-{ "v4": { "192.168.0.2": { "icmp_in": null, "icmp_out": null, "tcp_in": { "num": 101, "len": { "0": 101 }, "port": { "56951": 101 } }, "tcp_out": { "num": 54, "len": { "0": 47, "1": 2, "2": 3, "9": 2 }, "port": { "22": 54 } }, "udp_in": null, "udp_out": null } }, "v6": null }
