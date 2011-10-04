@@ -3,7 +3,6 @@ import os
 import glob
 import json
 
-
 #merge a to b
 def merge(a, b):
    try:
@@ -29,7 +28,7 @@ def main():
       dirname = argvs[argvs.index('-d') + 1]
       time = argvs[argvs.index('-t') + 1]
    except:
-      print "usage: -d dirname, -t timerange"
+      print "usage: -d dirname, -t timerange, [-w filename]"
 
    try:
       writename = argvs[argvs.index('-w') + 1]
@@ -38,6 +37,7 @@ def main():
       w = sys.stdout
          
    os.chdir(dirname)
+   
    j = []
    for filename in glob.glob("map646_"+time+".stat"):
       f = open(filename)

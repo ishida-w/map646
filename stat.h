@@ -25,6 +25,7 @@
 
 #define STAT_SOCK "/tmp/map646_stat"
 #include <map>
+#include <sstream>
 #include <sys/time.h>
 namespace map646_stat{
 
@@ -123,13 +124,48 @@ namespace map646_stat{
       }
    };
 
+   struct map646_time{
+      public:
+         int update(){
+            time(&timer);
+            t_st = localtime(&timer);
+
+            return 0;
+         }
+         std::string get_time()const{  
+            std::stringstream ss;
+            int mon, day, hour, min;
+            ss << (t_st->tm_year+1900);
+            if(mon = t_st->tm_mon+1 < 10){
+               ss << 0;
+            }
+            ss << mon;
+            if(day = t_st->tm_mday < 10){
+               ss << 0;
+            }
+            ss << day;
+            if(hour = t_st->tm_hour < 10){
+               ss << 0;
+            }
+            ss << hour;
+            if(min = t_st->tm_min < 10){
+               ss << 0;
+            }
+            ss << min;
+            return ss.str();
+         }
+      private:
+         time_t timer;
+         tm *t_st;
+   };
+
    class stat{
       public:
          int update(const uint8_t *bufp, ssize_t len, uint8_t d);
-         int show();
          void flush();
          int write_stat(int fd);
          int write_info(int fd);
+         int write_last_flush_time(int fd);
          /*
           *  int safe_write(int fd, std::string msg)
           *  communicate with stat_client and send the msg size before send the msg itself 
@@ -140,6 +176,7 @@ namespace map646_stat{
          int get_hist(int len);
          std::map<map646_in6_addr, stat_chunk> stat66;
          std::map<map646_in_addr, stat_chunk> stat46;
+         map646_time last_flush;
    };
    
    std::string get_proto(int proto);

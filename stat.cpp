@@ -348,66 +348,9 @@ namespace map646_stat{
 
       return 0;
    }
-   
-   int stat::show(){
-      std::map<map646_in_addr, stat_chunk>::iterator it = stat46.begin();
-      std::cout << "STAT" << std::endl; 
-      while(it != stat46.end()){
-         std::cout << "4to6" << std::endl;
-         std::cout << " service addr: " << it->first.get_addr() << std::endl;
-         
-         for(int i = 0; i < 6; i++){
-            std::cout << "  " << get_proto(i) << ": " << std::endl;
-            std::cout << "   num = " << it->second.stat_element[i].num << std::endl;
-
-            for(int j = 0; j < 11; j++){
-               int len =  it->second.stat_element[i].len[j];
-               if(len != 0)
-                  std::cout << "   len[" << j << "] = " << len << std::endl;
-            }
-            if(!it->second.stat_element[i].port_stat.empty()){
-               std::map<int, int>::iterator port_it = it->second.stat_element[i].port_stat.begin();
-               while(port_it != it->second.stat_element[i].port_stat.end()){
-                  std::cout << "    " << port_it->first << " = " << port_it->second << std::endl;
-                  port_it++;
-               }
-            }
-         }
-         
-         it++;
-      }
-
-      std::map<map646_in6_addr, stat_chunk>::iterator it6 = stat66.begin();
-      while(it6 != stat66.end()){
-         std::cout << "6to6" << std::endl;
-         std::cout << " service addr: " << it6->first.get_addr() << std::endl;
-
-         for(int i = 0; i < 6; i++){
-            std::cout << "  " << get_proto(i) << ": " << std::endl;
-            std::cout << "   num = " << it6->second.stat_element[i].num << std::endl;
-            for(int j = 0; j < 11; j++){
-               int len =  it6->second.stat_element[i].len[j];
-               if(len != 0)
-                  std::cout << "   len[" << j << "] = " << len << std::endl;
-            }
-            if(!it6->second.stat_element[i].port_stat.empty()){
-               std::map<int, int>::iterator port_it = it6->second.stat_element[i].port_stat.begin();
-               std::cout << "   port: " << std::endl;
-               while(port_it != it6->second.stat_element[i].port_stat.end()){
-                  std::cout << "    " << port_it->first << " = " << port_it->second << std::endl;
-                  port_it++;
-               }
-            }
-         }
-
-         it6++;
-      }
-
-      return 0;
-
-   }
-
+  
    void stat::flush(){
+      last_flush.update();
       std::map<map646_in6_addr, stat_chunk>().swap(stat66);
       std::map<map646_in_addr, stat_chunk>().swap(stat46);
    }
@@ -439,8 +382,13 @@ namespace map646_stat{
 
    }
 
+   int stat::write_last_flush_time(int fd){
+      return safe_write(fd, last_flush.get_time());
+   }
+
    int stat::write_info(int fd){
       std::stringstream ss;
+      ss << "lastupdate: " << last_flush.get_time() << std::endl;
       ss << "stat46_size: " << stat46.size() << std::endl;
 
       std::map<map646_in_addr, stat_chunk>::iterator it = stat46.begin();

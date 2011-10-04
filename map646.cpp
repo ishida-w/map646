@@ -233,7 +233,7 @@ int main(int argc, char *argv[])
          }else{
             const int COMMAND_SIZE = 10;
             char command[COMMAND_SIZE];
-            std::string list("show, info, flush, toggle, help, stat");
+            std::string list("show, info, time, flush, toggle, help, stat");
             memset(command, 0, COMMAND_SIZE);
             int size;
             if((size = read(fd, command, COMMAND_SIZE)) < 0){
@@ -243,6 +243,8 @@ int main(int argc, char *argv[])
                   map_stat.write_stat(stat_fd);
                }else if(strcmp(command, "info") == 0){
                   map_stat.write_info(stat_fd);
+               }else if(strcmp(command, "time") == 0){
+                  map_stat.write_last_flush_time(stat_fd);
                }else if(strcmp(command, "flush") == 0){
                   map_stat.flush();
                   map_stat.safe_write(fd, std::string("flushed"));

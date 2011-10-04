@@ -33,7 +33,7 @@ def main(argvs):
    try:
       i = argvs.index("-d")
       dirname = argvs[i+1]
-      filename = str("/")+time_struct_to_str(time.localtime())+str(".stat")
+      filename = str("/")+str("map646_")+time_struct_to_str(time.localtime())+str(".stat")
       f = open(dirname+filename, 'w')
       command_index.remove(i)
       command_index.remove(i+1)
