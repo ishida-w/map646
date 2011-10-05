@@ -43,7 +43,6 @@ namespace map646_stat{
       struct _stat_element{
          int num;      
          int error;
-         //int len[11];
          std::map<int, int> len;
          std::map<int, int> port_stat;
       }stat_element[6];
@@ -126,29 +125,31 @@ namespace map646_stat{
 
    struct map646_time{
       public:
-         int update(){
+         map646_time(){
+            update();
+         }
+         
+         void update(){
             time(&timer);
             t_st = localtime(&timer);
-
-            return 0;
          }
          std::string get_time()const{  
             std::stringstream ss;
             int mon, day, hour, min;
             ss << (t_st->tm_year+1900);
-            if(mon = t_st->tm_mon+1 < 10){
+            if((mon = t_st->tm_mon+1) < 10){
                ss << 0;
             }
             ss << mon;
-            if(day = t_st->tm_mday < 10){
+            if((day = t_st->tm_mday) < 10){
                ss << 0;
             }
             ss << day;
-            if(hour = t_st->tm_hour < 10){
+            if((hour = t_st->tm_hour) < 10){
                ss << 0;
             }
             ss << hour;
-            if(min = t_st->tm_min < 10){
+            if((min = t_st->tm_min) < 10){
                ss << 0;
             }
             ss << min;
