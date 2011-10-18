@@ -26,37 +26,24 @@ def time_struct_to_str(tm):
    mn = a0ifnec(str(tm.tm_min))
    return year+mon+mday+hour+mn
 
-def main(argvs):
-   argc = len(argvs)
-   command_index = range(0,argc)
-
-   try:
-      i = argvs.index("-d")
-      dirname = argvs[i+1]
-      filename = str("/")+str("map646_")+time_struct_to_str(time.localtime())+str(".stat")
-      f = open(dirname+filename, 'w')
-      command_index.remove(i)
-      command_index.remove(i+1)
-   except:
-      f = sys.stdout
-
+def connect():
    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
    s.connect(SOCK_FILENAME)
+   return s
 
+
+def main_loop():
    try:
-      command = argvs[command_index.pop()]
-      com(f, s, command)
-   except:
-      try:
-         while True:
-            command = raw_input('>> ')
-            com(f, s, command)
-            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.connect(SOCK_FILENAME)
+      while True:
+         s = connect()
+         c = raw_input('>> ')
+         com(sys.stdout, s, c)
+   except KeyboardInterrupt:
+      s.close()
 
-      except KeyboardInterrupt:
-         s.close()
+def command(c, f=sys.stdout):
+   s = connect()
+   com(f, s, c)
 
 if __name__ == "__main__":
-   argvs = sys.argv
-   main(argvs)
+   main_loop()
