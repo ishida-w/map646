@@ -185,6 +185,8 @@ int main(int argc, char *argv[])
       int timeout = -1;
       struct epoll_event events[nfiles];
       if((res = epoll_wait(epfd, events, nfiles, timeout)) == -1){
+         if (errno == EINTR)
+            continue;
          errx(EXIT_FAILURE,"epoll_wait() failed ");
       }
 
@@ -329,6 +331,8 @@ cleanup(void)
 #if !defined(__linux__)
    (void)tun_dealloc(tun_if_name);
 #endif
+
+   exit(EXIT_SUCCESS);
 }
 
 /*
